@@ -40,7 +40,12 @@ app = FastAPI(
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=["timeplan.work", "www.timeplan.work", "*.up.railway.app"]
+        allowed_hosts=[
+            "timeplan.work",
+            "www.timeplan.work",
+            "timeplanwork.up.railway.app",
+            "localhost",
+        ]
     )
 
 # 2. CORS — contrôle strict des origines
