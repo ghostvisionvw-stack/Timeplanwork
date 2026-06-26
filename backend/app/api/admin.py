@@ -1,0 +1,196 @@
+from datetime import datetime, timezone
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import func, desc
+from app.models.models import User, WorkDay, AuditLog, SubscriptionStatus
+from app.api.auth import get_current_admin
+from app.core.database import get_db
+
+router = APIRouter(prefix="/api/admin", tags=["admin"])
+
+# ── DASHBOARD ──
+@router.get("/dashboard")
+async def dashboard(
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Statistiques globales pour l'admin."""
+    total_users    = db.query(func.count(User.id)).scalar()
+    pro_users      = db.query(func.count(User.id)).filter(User.subscription_status == SubscriptionStatus.PRO).scalar()
+    free_users     = total_users - pro_users
+    total_days     = db.query(func.count(WorkDay.id)).scalar()
+    new_today      = db.query(func.count(User.id)).filter(
+        func.date(User.created_at) == datetime.now(timezone.utc).date()
+    ).scalar()
+
+    return {
+        "users": {
+            "total": total_users,
+            "pro": pro_users,
+            "free": free_users,
+            "new_today": new_today,
+        },
+        "work_days": {"total": total_days},
+        "mrr_estimate": round(pro_users * 4.99, 2),  # Revenu mensuel estimé
+    }
+
+# ── LISTE UTILISATEURS ──
+@router.get("/users")
+async def list_users(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(20, ge=1, le=100),
+    search: Optional[str] = None,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Liste paginée des utilisateurs avec filtres."""
+    q = db.query(User)
+    if search:
+        q = q.filter(User.email.ilike(f"%{search}%") | User.full_name.ilike(f"%{search}%"))
+    if status == "pro":
+        q = q.filter(User.subscription_status == SubscriptionStatus.PRO)
+    elif status == "free":
+        q = q.filter(User.subscription_status == SubscriptionStatus.FREE)
+    elif status == "inactive":
+        q = q.filter(User.is_active == False)
+
+    total = q.count()
+    users = q.order_by(desc(User.created_at)).offset((page-1)*per_page).limit(per_page).all()
+
+    return {
+        "total": total,
+        "page": page,
+        "per_page": per_page,
+        "users": [
+            {
+                "id": u.id,
+                "email": u.email,
+                "full_name": u.full_name,
+                "is_active": u.is_active,
+                "is_pro": u.is_pro,
+                "subscription_status": u.subscription_status,
+                "created_at": u.created_at.isoformat(),
+                "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
+                "work_days_count": db.query(func.count(WorkDay.id)).filter(WorkDay.user_id == u.id).scalar(),
+            }
+            for u in users
+        ]
+    }
+
+# ── DÉTAIL UTILISATEUR ──
+@router.get("/users/{user_id}")
+async def get_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    logs = db.query(AuditLog).filter(
+        AuditLog.user_id == user_id
+    ).order_by(desc(AuditLog.created_at)).limit(20).all()
+
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "is_active": user.is_active,
+        "is_admin": user.is_admin,
+        "is_pro": user.is_pro,
+        "subscription_status": user.subscription_status,
+        "stripe_customer_id": user.stripe_customer_id,
+        "hourly_rate": user.hourly_rate,
+        "contract_hours": user.contract_hours,
+        "country": user.country,
+        "created_at": user.created_at.isoformat(),
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "failed_login_count": user.failed_login_count,
+        "locked_until": user.locked_until.isoformat() if user.locked_until else None,
+        "recent_activity": [
+            {"action": l.action, "ip": l.ip_address, "at": l.created_at.isoformat()}
+            for l in logs
+        ]
+    }
+
+# ── ACTIONS ADMIN ──
+@router.patch("/users/{user_id}/activate")
+async def toggle_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Activer ou désactiver un compte utilisateur."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Impossible de modifier votre propre compte.")
+    user.is_active = not user.is_active
+    db.commit()
+    action = "activé" if user.is_active else "désactivé"
+    return {"message": f"Compte {action} avec succès.", "is_active": user.is_active}
+
+@router.patch("/users/{user_id}/unlock")
+async def unlock_user(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Déverrouiller un compte après trop d'échecs de connexion."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    user.failed_login_count = 0
+    user.locked_until = None
+    db.commit()
+    return {"message": "Compte déverrouillé."}
+
+@router.patch("/users/{user_id}/grant-pro")
+async def grant_pro(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Accorder l'accès Pro manuellement (ex: compensation, test)."""
+    from datetime import timedelta
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    user.subscription_status = SubscriptionStatus.PRO
+    user.sub_expires_at = datetime.now(timezone.utc) + timedelta(days=30)
+    db.commit()
+    return {"message": f"Accès Pro accordé à {user.email} pour 30 jours."}
+
+# ── LOGS D'AUDIT ──
+@router.get("/audit-logs")
+async def audit_logs(
+    page: int = Query(1, ge=1),
+    per_page: int = Query(50, ge=1, le=200),
+    action: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    """Journal d'audit complet — toutes les actions sensibles."""
+    q = db.query(AuditLog)
+    if action:
+        q = q.filter(AuditLog.action == action)
+    total = q.count()
+    logs = q.order_by(desc(AuditLog.created_at)).offset((page-1)*per_page).limit(per_page).all()
+    return {
+        "total": total,
+        "logs": [
+            {
+                "id": l.id,
+                "user_id": l.user_id,
+                "action": l.action,
+                "ip_address": l.ip_address,
+                "details": l.details,
+                "at": l.created_at.isoformat()
+            }
+            for l in logs
+        ]
+    }
