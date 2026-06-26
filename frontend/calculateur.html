@@ -1,1 +1,884 @@
-calculateur-heures.html
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Calculateur Heures – Dacol Express</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3350;
+    --accent: #4f8ef7;
+    --accent2: #f74f4f;
+    --green: #2ecc71;
+    --orange: #f39c12;
+    --red: #e74c3c;
+    --text: #e8eaf6;
+    --muted: #7a7f9a;
+    --font: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a1d27 0%, #0f1117 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 20px 16px 16px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  header p {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 6px;
+  }
+
+  .container { padding: 0 16px; }
+
+  /* === FORMULAIRE AJOUT === */
+  .form-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+
+  .form-card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .field-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .field-row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field-row.single { grid-template-columns: 1fr; }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 5px;
+  }
+
+  input, select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px;
+    padding: 11px 12px;
+    font-family: var(--font);
+    -webkit-appearance: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  input:focus, select:focus {
+    border-color: var(--accent);
+  }
+
+  input[type="time"] {
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    letter-spacing: 1px;
+  }
+
+  input[type="date"] { font-size: 14px; }
+
+  .checkbox-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 12px;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+
+  .checkbox-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    padding: 0;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+
+  .checkbox-row span {
+    font-size: 13px;
+    color: var(--text);
+  }
+
+  .btn-add {
+    width: 100%;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 14px;
+    cursor: pointer;
+    margin-top: 6px;
+    font-family: var(--font);
+    transition: opacity 0.15s;
+    letter-spacing: 0.2px;
+  }
+
+  .btn-add:active { opacity: 0.8; }
+
+  /* === RÉCAP TOTAUX === */
+  .totaux-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 14px;
+  }
+
+  .totaux-card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 14px;
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .stat-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+
+  .stat-box .val {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1;
+  }
+
+  .stat-box .lbl {
+    font-size: 10px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-top: 5px;
+  }
+
+  .val.green { color: var(--green); }
+  .val.red { color: var(--red); }
+  .val.orange { color: var(--orange); }
+  .val.blue { color: var(--accent); }
+
+  .total-ecart {
+    background: linear-gradient(135deg, #1a2a1a, #0f1a0f);
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 10px;
+    text-align: center;
+  }
+
+  .total-ecart.negatif {
+    background: linear-gradient(135deg, #2a1a1a, #1a0f0f);
+    border-color: var(--red);
+  }
+
+  .total-ecart .big {
+    font-size: 32px;
+    font-weight: 900;
+    letter-spacing: -1px;
+    color: var(--green);
+  }
+
+  .total-ecart.negatif .big { color: var(--red); }
+
+  .total-ecart .sub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* === LISTE DES JOURS === */
+  .list-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 18px;
+    margin-top: 14px;
+  }
+
+  .list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+  }
+
+  .list-header h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .btn-export {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: var(--font);
+  }
+
+  .day-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .day-item .date-label {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .day-item .day-detail {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .day-item .ecart-pill {
+    font-size: 13px;
+    font-weight: 800;
+    padding: 5px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    text-align: right;
+  }
+
+  .ecart-pill.pos { background: rgba(46,204,113,0.15); color: var(--green); }
+  .ecart-pill.neg { background: rgba(231,76,60,0.15); color: var(--red); }
+  .ecart-pill.zero { background: rgba(127,140,141,0.15); color: var(--muted); }
+  .ecart-pill.samedi { background: rgba(243,156,18,0.15); color: var(--orange); }
+  .ecart-pill.chomage { background: rgba(79,142,247,0.15); color: var(--accent); }
+
+  .day-item .delete-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+  }
+
+  .day-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 30px 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  .empty-state .icon { font-size: 32px; margin-bottom: 8px; }
+
+  /* === FILTRE MOIS === */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 12px 0 4px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .filter-bar::-webkit-scrollbar { display: none; }
+
+  .filter-chip {
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 6px 14px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-family: var(--font);
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+
+  .filter-chip.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* === EXPORT TEXTE === */
+  .export-area {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-top: 12px;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+    display: none;
+    line-height: 1.7;
+  }
+
+  .export-area.visible { display: block; }
+
+  .btn-copy {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    margin-top: 10px;
+    font-family: var(--font);
+    display: none;
+  }
+
+  .btn-copy.visible { display: block; }
+
+  .info-box {
+    background: rgba(79,142,247,0.08);
+    border: 1px solid rgba(79,142,247,0.3);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .info-box strong { color: var(--accent); }
+
+  select option { background: #1a1d27; }
+
+  .section-sep {
+    height: 1px;
+    background: var(--border);
+    margin: 16px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>⏱ Calculateur Heures</h1>
+  <p>Heures réelles vs fiches de salaire</p>
+  <span class="badge">Dossier Prud'hommes</span>
+</header>
+
+<div class="container">
+
+  <!-- FORMULAIRE -->
+  <div class="form-card">
+    <h2>➕ Ajouter une journée</h2>
+
+    <div class="field-row">
+      <div>
+        <label>Date</label>
+        <input type="date" id="inp-date">
+      </div>
+      <div>
+        <label>Type de journée</label>
+        <select id="inp-type">
+          <option value="travail">Travail normal</option>
+          <option value="samedi">Samedi travaillé</option>
+          <option value="chomage">Chômage éco</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="zone-heures">
+      <div class="field-row">
+        <div>
+          <label>Heure début (dépôt)</label>
+          <input type="time" id="inp-debut" value="07:00">
+        </div>
+        <div>
+          <label>Heure fin (retour dépôt)</label>
+          <input type="time" id="inp-fin" value="">
+        </div>
+      </div>
+
+      <div class="field-row single">
+        <div>
+          <label>Heures payées sur fiche (ex: 8.00)</label>
+          <input type="number" id="inp-paye" min="0" max="24" step="0.25" placeholder="8.00" value="8">
+        </div>
+      </div>
+    </div>
+
+    <div id="zone-chomage" style="display:none">
+      <div class="info-box">
+        <strong>Chômage économique</strong> — journée non travaillée, allocations ONEM. Aucune heure réelle à comparer.
+      </div>
+    </div>
+
+    <div class="field-row single" style="margin-top:10px">
+      <div>
+        <label>Note (optionnel)</label>
+        <input type="text" id="inp-note" placeholder="Ex: Fitting Genk, retard dépôt...">
+      </div>
+    </div>
+
+    <button class="btn-add" onclick="ajouterJour()">Enregistrer cette journée</button>
+  </div>
+
+  <!-- TOTAUX -->
+  <div class="totaux-card" id="bloc-totaux" style="display:none">
+    <h2>📊 Récapitulatif</h2>
+    <div class="stat-grid">
+      <div class="stat-box">
+        <div class="val blue" id="tot-jours">0</div>
+        <div class="lbl">Jours travaillés</div>
+      </div>
+      <div class="stat-box">
+        <div class="val orange" id="tot-samedis">0</div>
+        <div class="lbl">Samedis non payés</div>
+      </div>
+      <div class="stat-box">
+        <div class="val blue" id="tot-reelles">0h00</div>
+        <div class="lbl">Heures réelles</div>
+      </div>
+      <div class="stat-box">
+        <div class="val" id="tot-payees">0h00</div>
+        <div class="lbl">Heures payées</div>
+      </div>
+    </div>
+
+    <div class="total-ecart" id="bloc-ecart">
+      <div class="big" id="ecart-total">+0h00</div>
+      <div class="sub" id="ecart-label">Heures supplémentaires non rémunérées</div>
+    </div>
+
+    <div class="info-box" style="margin-top:10px">
+      <strong>CP 140.03 :</strong> les heures au-delà de 8h/jour sont des heures supplémentaires légalement dues. Ce tableau constitue une preuve chiffrée pour votre dossier.
+    </div>
+  </div>
+
+  <!-- LISTE DES JOURS -->
+  <div class="list-card">
+    <div class="list-header">
+      <h2>📋 Historique</h2>
+      <button class="btn-export" onclick="toggleExport()">Exporter</button>
+    </div>
+
+    <div class="filter-bar" id="filter-bar">
+      <button class="filter-chip active" onclick="filtrer('tous', this)">Tous</button>
+    </div>
+
+    <div id="liste-jours">
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        Aucune journée enregistrée.<br>Commencez par ajouter une journée ci-dessus.
+      </div>
+    </div>
+
+    <pre class="export-area" id="export-area"></pre>
+    <button class="btn-copy" id="btn-copy" onclick="copierExport()">📋 Copier le récapitulatif</button>
+  </div>
+
+</div>
+
+<script>
+// ==================== DONNÉES ====================
+let jours = JSON.parse(localStorage.getItem('heures_dacol') || '[]');
+let filtreActif = 'tous';
+
+// ==================== INIT ====================
+document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
+document.getElementById('inp-type').addEventListener('change', function() {
+  document.getElementById('zone-heures').style.display = this.value === 'chomage' ? 'none' : 'block';
+  document.getElementById('zone-chomage').style.display = this.value === 'chomage' ? 'block' : 'none';
+});
+
+// ==================== UTILS ====================
+function parseTime(str) {
+  if (!str) return null;
+  const [h, m] = str.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minToStr(min) {
+  const sign = min < 0 ? '-' : '+';
+  const abs = Math.abs(min);
+  const h = Math.floor(abs / 60);
+  const m = abs % 60;
+  return sign + h + 'h' + String(m).padStart(2, '0');
+}
+
+function minToStrAbs(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return h + 'h' + String(m).padStart(2, '0');
+}
+
+function formatDate(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const jours = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+  const mois = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc'];
+  return jours[d.getDay()] + ' ' + d.getDate() + ' ' + mois[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function getMoisLabel(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const mois = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre'];
+  return mois[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+function getMoisKey(dateStr) {
+  return dateStr.substring(0, 7);
+}
+
+// ==================== SAUVEGARDER ====================
+function sauvegarder() {
+  localStorage.setItem('heures_dacol', JSON.stringify(jours));
+}
+
+// ==================== AJOUTER ====================
+function ajouterJour() {
+  const date = document.getElementById('inp-date').value;
+  const type = document.getElementById('inp-type').value;
+  const debut = document.getElementById('inp-debut').value;
+  const fin = document.getElementById('inp-fin').value;
+  const paye = parseFloat(document.getElementById('inp-paye').value) || 0;
+  const note = document.getElementById('inp-note').value.trim();
+
+  if (!date) { alert('⚠️ Veuillez sélectionner une date.'); return; }
+
+  if (type !== 'chomage') {
+    if (!fin) { alert('⚠️ Veuillez entrer l\'heure de fin de tournée.'); return; }
+    const dMin = parseTime(debut);
+    const fMin = parseTime(fin);
+    if (fMin <= dMin) { alert('⚠️ L\'heure de fin doit être après l\'heure de début.'); return; }
+  }
+
+  // Vérifier doublons
+  if (jours.find(j => j.date === date)) {
+    if (!confirm('Une entrée existe déjà pour cette date. Remplacer ?')) return;
+    jours = jours.filter(j => j.date !== date);
+  }
+
+  let entree = { date, type, note };
+
+  if (type !== 'chomage') {
+    const dMin = parseTime(debut);
+    const fMin = parseTime(fin);
+    const reelles = fMin - dMin;
+    const payeesMin = Math.round(paye * 60);
+    const ecart = reelles - payeesMin;
+
+    entree = { ...entree, debut, fin, reellesMin: reelles, payeesMin, ecartMin: ecart };
+  }
+
+  jours.push(entree);
+  jours.sort((a, b) => a.date.localeCompare(b.date));
+  sauvegarder();
+  rendreListe();
+  calculerTotaux();
+
+  // Reset fin et note
+  document.getElementById('inp-fin').value = '';
+  document.getElementById('inp-note').value = '';
+  document.getElementById('inp-paye').value = '8';
+  document.getElementById('inp-type').value = 'travail';
+  document.getElementById('zone-heures').style.display = 'block';
+  document.getElementById('zone-chomage').style.display = 'none';
+
+  // Avancer date au prochain jour ouvrable
+  const d = new Date(date + 'T00:00:00');
+  d.setDate(d.getDate() + 1);
+  if (d.getDay() === 0) d.setDate(d.getDate() + 1); // skip dimanche
+  document.getElementById('inp-date').value = d.toISOString().split('T')[0];
+}
+
+// ==================== SUPPRIMER ====================
+function supprimerJour(date) {
+  if (!confirm('Supprimer cette journée ?')) return;
+  jours = jours.filter(j => j.date !== date);
+  sauvegarder();
+  rendreListe();
+  calculerTotaux();
+}
+
+// ==================== TOTAUX ====================
+function calculerTotaux() {
+  const travailles = jours.filter(j => j.type !== 'chomage');
+  const samedis = jours.filter(j => j.type === 'samedi');
+
+  const totalReelles = travailles.reduce((s, j) => s + (j.reellesMin || 0), 0);
+  const totalPayees = travailles.reduce((s, j) => s + (j.payeesMin || 0), 0);
+  const totalEcart = totalReelles - totalPayees;
+
+  document.getElementById('tot-jours').textContent = travailles.length;
+  document.getElementById('tot-samedis').textContent = samedis.length;
+  document.getElementById('tot-reelles').textContent = minToStrAbs(totalReelles);
+  document.getElementById('tot-payees').textContent = minToStrAbs(totalPayees);
+
+  const ecartEl = document.getElementById('ecart-total');
+  const ecartBloc = document.getElementById('bloc-ecart');
+  ecartEl.textContent = minToStr(totalEcart);
+
+  if (totalEcart > 0) {
+    ecartBloc.className = 'total-ecart';
+    ecartEl.style.color = 'var(--green)';
+    document.getElementById('ecart-label').textContent = 'heures supplémentaires non rémunérées';
+  } else if (totalEcart < 0) {
+    ecartBloc.className = 'total-ecart negatif';
+    ecartEl.style.color = 'var(--red)';
+    document.getElementById('ecart-label').textContent = 'heures manquantes (vérifier les données)';
+  } else {
+    ecartEl.style.color = 'var(--muted)';
+    document.getElementById('ecart-label').textContent = 'aucun écart détecté';
+  }
+
+  document.getElementById('bloc-totaux').style.display = jours.length > 0 ? 'block' : 'none';
+}
+
+// ==================== FILTRE ====================
+function filtrer(mois, el) {
+  filtreActif = mois;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  rendreListe();
+}
+
+function mettreAJourFiltres() {
+  const moisUniques = [...new Set(jours.map(j => getMoisKey(j.date)))].sort();
+  const bar = document.getElementById('filter-bar');
+  bar.innerHTML = '<button class="filter-chip' + (filtreActif === 'tous' ? ' active' : '') + '" onclick="filtrer(\'tous\', this)">Tous</button>';
+  moisUniques.forEach(m => {
+    const label = getMoisLabel(m + '-01');
+    const chip = document.createElement('button');
+    chip.className = 'filter-chip' + (filtreActif === m ? ' active' : '');
+    chip.textContent = label;
+    chip.onclick = function() { filtrer(m, this); };
+    bar.appendChild(chip);
+  });
+}
+
+// ==================== LISTE ====================
+function rendreListe() {
+  mettreAJourFiltres();
+
+  const filtres = filtreActif === 'tous'
+    ? [...jours].reverse()
+    : [...jours].filter(j => getMoisKey(j.date) === filtreActif).reverse();
+
+  const container = document.getElementById('liste-jours');
+
+  if (filtres.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="icon">📭</div>Aucune journée enregistrée.<br>Commencez par ajouter une journée ci-dessus.</div>';
+    return;
+  }
+
+  container.innerHTML = filtres.map(j => {
+    let pillClass, pillText, details;
+
+    if (j.type === 'chomage') {
+      pillClass = 'chomage';
+      pillText = '💤 Chômage éco';
+      details = 'Journée non travaillée — ONEM';
+    } else if (j.type === 'samedi') {
+      pillClass = 'samedi';
+      const e = j.ecartMin;
+      pillText = '📅 Sam. ' + minToStr(e);
+      details = j.debut + ' → ' + j.fin + ' | Réel: ' + minToStrAbs(j.reellesMin) + ' | Payé: ' + minToStrAbs(j.payeesMin);
+    } else {
+      const e = j.ecartMin;
+      pillClass = e > 0 ? 'pos' : e < 0 ? 'neg' : 'zero';
+      pillText = minToStr(e);
+      details = j.debut + ' → ' + j.fin + ' | Réel: ' + minToStrAbs(j.reellesMin) + ' | Payé: ' + minToStrAbs(j.payeesMin);
+    }
+
+    const noteHtml = j.note ? '<br><span style="color:var(--accent);font-size:10px">💬 ' + j.note + '</span>' : '';
+
+    return `<div class="day-item">
+      <div>
+        <div class="date-label">${formatDate(j.date)}</div>
+        <div class="day-detail">${details}${noteHtml}</div>
+      </div>
+      <div class="day-actions">
+        <span class="ecart-pill ${pillClass}">${pillText}</span>
+        <button class="delete-btn" onclick="supprimerJour('${j.date}')">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ==================== EXPORT ====================
+function toggleExport() {
+  const area = document.getElementById('export-area');
+  const btn = document.getElementById('btn-copy');
+
+  if (area.classList.contains('visible')) {
+    area.classList.remove('visible');
+    btn.classList.remove('visible');
+    return;
+  }
+
+  const moisFiltres = filtreActif === 'tous'
+    ? [...jours]
+    : jours.filter(j => getMoisKey(j.date) === filtreActif);
+
+  if (moisFiltres.length === 0) {
+    alert('Aucune donnée à exporter.');
+    return;
+  }
+
+  const travailles = moisFiltres.filter(j => j.type !== 'chomage');
+  const samedis = moisFiltres.filter(j => j.type === 'samedi');
+  const totalReelles = travailles.reduce((s, j) => s + (j.reellesMin || 0), 0);
+  const totalPayees = travailles.reduce((s, j) => s + (j.payeesMin || 0), 0);
+  const totalEcart = totalReelles - totalPayees;
+
+  const titre = filtreActif === 'tous' ? 'TOUTES LES PÉRIODES' : getMoisLabel(filtreActif + '-01').toUpperCase();
+
+  let txt = '═══════════════════════════════════\n';
+  txt += '  RÉCAPITULATIF HEURES – ' + titre + '\n';
+  txt += '  Pirard Mickael vs DACOL EXPRESS\n';
+  txt += '  CP 140.03 – Dossier Prud\'hommes\n';
+  txt += '═══════════════════════════════════\n\n';
+
+  let moisCourant = '';
+  moisFiltres.forEach(j => {
+    const mk = getMoisKey(j.date);
+    if (mk !== moisCourant) {
+      if (moisCourant) txt += '\n';
+      txt += '── ' + getMoisLabel(j.date) + ' ──\n';
+      moisCourant = mk;
+    }
+
+    if (j.type === 'chomage') {
+      txt += formatDate(j.date) + '\n';
+      txt += '  → CHÔMAGE ÉCONOMIQUE\n';
+    } else {
+      const e = j.ecartMin;
+      const eStr = minToStr(e);
+      txt += formatDate(j.date) + (j.type === 'samedi' ? ' [SAMEDI]' : '') + '\n';
+      txt += '  Début: ' + j.debut + '  Fin: ' + j.fin + '\n';
+      txt += '  Réel: ' + minToStrAbs(j.reellesMin) + '  |  Payé: ' + minToStrAbs(j.payeesMin) + '  |  Écart: ' + eStr + '\n';
+    }
+    if (j.note) txt += '  Note: ' + j.note + '\n';
+  });
+
+  txt += '\n═══════════════════════════════════\n';
+  txt += 'TOTAUX\n';
+  txt += '  Jours travaillés : ' + travailles.length + '\n';
+  txt += '  Samedis non payés : ' + samedis.length + '\n';
+  txt += '  Heures réelles    : ' + minToStrAbs(totalReelles) + '\n';
+  txt += '  Heures payées     : ' + minToStrAbs(totalPayees) + '\n';
+  txt += '  ─────────────────────────────\n';
+  txt += '  ÉCART TOTAL       : ' + minToStr(totalEcart) + '\n';
+  txt += '═══════════════════════════════════\n';
+  txt += 'Document généré le ' + new Date().toLocaleDateString('fr-BE') + '\n';
+
+  area.textContent = txt;
+  area.classList.add('visible');
+  btn.classList.add('visible');
+}
+
+function copierExport() {
+  const txt = document.getElementById('export-area').textContent;
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.getElementById('btn-copy');
+    btn.textContent = '✅ Copié !';
+    setTimeout(() => btn.textContent = '📋 Copier le récapitulatif', 2000);
+  });
+}
+
+// ==================== DÉMARRAGE ====================
+rendreListe();
+calculerTotaux();
+</script>
+</body>
+</html>
