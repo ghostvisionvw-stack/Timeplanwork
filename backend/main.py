@@ -3,6 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
 from app.core.config import settings
 from app.core.middleware import SecurityMiddleware
 from app.core.database import engine, Base
@@ -36,7 +39,7 @@ app = FastAPI(
 
 # ── MIDDLEWARES (ordre important) ──
 
-# 1. Trusted Hosts — bloquer les requêtes avec Host header invalide
+# 1. Trusted Hosts
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
@@ -48,7 +51,7 @@ if settings.ENVIRONMENT == "production":
         ]
     )
 
-# 2. CORS — contrôle strict des origines
+# 2. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -58,10 +61,10 @@ app.add_middleware(
     max_age=3600,
 )
 
-# 3. Sécurité custom (headers + rate limiting + logging)
+# 3. Sécurité custom
 app.add_middleware(SecurityMiddleware)
 
-# ── ROUTES ──
+# ── ROUTES API ──
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(stripe_webhook.router)
@@ -71,7 +74,20 @@ app.include_router(stripe_webhook.router)
 async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
-# ── ROUTE RACINE ──
+# ── PAGES FRONTEND ──
+FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+
+@app.get("/calculateur")
+async def calculateur():
+    return FileResponse(FRONTEND_DIR / "calculateur.html")
+
 @app.get("/")
 async def root():
+    index = FRONTEND_DIR / "index.html"
+    if index.exists():
+        return FileResponse(index)
     return {"message": "TimePlan.work API", "docs": "Accès restreint en production."}
+
+# ── FICHIERS STATIQUES (CSS, JS, images) ──
+if FRONTEND_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
