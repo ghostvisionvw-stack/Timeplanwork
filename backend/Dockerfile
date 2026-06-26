@@ -14,4 +14,4 @@ COPY . .
 RUN adduser --disabled-password --gecos '' appuser
 USER appuser
 
-CMD ["python", "-c", "import os,uvicorn; uvicorn.run('main:app', host='0.0.0.0', port=int(os.environ.get('PORT', 8000)), workers=1)"]
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
