@@ -2,7 +2,6 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -37,21 +36,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── MIDDLEWARES (ordre important) ──
+# ── MIDDLEWARES ──
 
-# 1. Trusted Hosts
-if settings.ENVIRONMENT == "production":
-    app.add_middleware(
-        TrustedHostMiddleware,
-        allowed_hosts=[
-            "timeplan.work",
-            "www.timeplan.work",
-            "timeplanwork.up.railway.app",
-            "localhost",
-        ]
-    )
-
-# 2. CORS
+# 1. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -61,7 +48,7 @@ app.add_middleware(
     max_age=3600,
 )
 
-# 3. Sécurité custom
+# 2. Sécurité custom
 app.add_middleware(SecurityMiddleware)
 
 # ── ROUTES API ──
@@ -88,6 +75,6 @@ async def root():
         return FileResponse(index)
     return {"message": "TimePlan.work API", "docs": "Accès restreint en production."}
 
-# ── FICHIERS STATIQUES (CSS, JS, images) ──
+# ── FICHIERS STATIQUES ──
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
