@@ -6,96 +6,82 @@
 <title>Dashboard — TimePlan.work</title>
 <style>
 :root {
-  --bg: #0b0e18; --bg2: #131728; --bg3: #1c2136;
-  --border: #252d4a; --text: #e8edf8; --muted: #6b7799;
-  --accent: #3d7fff; --green: #00c875; --red: #ff5f57; --orange: #ff6b35;
-  --font: 'Inter', system-ui, sans-serif;
+  --bg:#0b0e18;--bg2:#131728;--bg3:#1c2136;--border:#252d4a;
+  --text:#e8edf8;--muted:#6b7799;--accent:#3d7fff;--green:#00c875;
+  --red:#ff5f57;--orange:#ff6b35;--purple:#8b5cf6;
+  --font:'Inter',system-ui,sans-serif;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
-nav {
-  background: var(--bg2); border-bottom: 1px solid var(--border);
-  padding: 0 24px; height: 60px;
-  display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 100;
-}
-.nav-logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; text-decoration: none; color: var(--text); }
-.nav-logo span { color: var(--accent); }
-.nav-right { display: flex; align-items: center; gap: 12px; }
-.nav-user { font-size: 13px; color: var(--muted); }
-.btn-logout {
-  background: transparent; border: 1px solid var(--border);
-  color: var(--muted); border-radius: 8px; padding: 6px 14px;
-  font-size: 13px; cursor: pointer; font-family: var(--font);
-  transition: border-color 0.2s;
-}
-.btn-logout:hover { border-color: var(--red); color: var(--red); }
-.main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
-.welcome { margin-bottom: 28px; }
-.welcome h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
-.welcome p { font-size: 14px; color: var(--muted); margin-top: 4px; }
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.stat-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px;
-}
-.stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.stat-card .value { font-size: 28px; font-weight: 900; letter-spacing: -1px; }
-.stat-card .value.green { color: var(--green); }
-.stat-card .value.accent { color: var(--accent); }
-.actions { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.action-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 24px;
-  text-decoration: none; color: var(--text);
-  transition: border-color 0.2s, transform 0.2s;
-  display: block;
-}
-.action-card:hover { border-color: var(--accent); transform: translateY(-2px); }
-.action-card .icon { font-size: 28px; margin-bottom: 12px; }
-.action-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
-.action-card p { font-size: 13px; color: var(--muted); line-height: 1.5; }
-.pro-banner {
-  background: linear-gradient(135deg, rgba(61,127,255,0.12), rgba(107,79,255,0.08));
-  border: 1px solid rgba(61,127,255,0.3);
-  border-radius: 14px; padding: 24px;
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
-  flex-wrap: wrap;
-}
-.pro-banner h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
-.pro-banner p { font-size: 13px; color: var(--muted); }
-.btn-pro {
-  background: var(--accent); color: #fff; border: none;
-  border-radius: 10px; font-size: 14px; font-weight: 700;
-  padding: 10px 22px; cursor: pointer; font-family: var(--font);
-  white-space: nowrap; transition: opacity 0.15s;
-}
-.btn-pro:hover { opacity: 0.88; }
-.badge-free {
-  display: inline-block; background: rgba(107,119,153,0.2);
-  color: var(--muted); font-size: 10px; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; text-transform: uppercase;
-  letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle;
-}
-.badge-pro {
-  display: inline-block; background: rgba(61,127,255,0.15);
-  color: var(--accent); font-size: 10px; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; text-transform: uppercase;
-  letter-spacing: 0.5px; margin-left: 8px; vertical-align: middle;
-}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.nav-logo{font-size:18px;font-weight:900;letter-spacing:-.5px;text-decoration:none;color:var(--text);}
+.nav-logo span{color:var(--accent);}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-user{font-size:13px;color:var(--muted);}
+.btn-sm{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:var(--font);transition:border-color .2s;text-decoration:none;display:inline-block;}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+.main{max-width:900px;margin:0 auto;padding:32px 24px;}
+.welcome{margin-bottom:28px;}
+.welcome h1{font-size:24px;font-weight:800;letter-spacing:-.5px;}
+.welcome p{font-size:14px;color:var(--muted);margin-top:4px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.stat-card .value{font-size:26px;font-weight:900;letter-spacing:-1px;}
+.value.green{color:var(--green);}.value.accent{color:var(--accent);}.value.orange{color:var(--orange);}
+.actions{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:16px;margin-bottom:24px;}
+.action-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;text-decoration:none;color:var(--text);transition:border-color .2s,transform .2s;display:block;cursor:pointer;}
+.action-card:hover{border-color:var(--accent);transform:translateY(-2px);}
+.action-card .icon{font-size:28px;margin-bottom:12px;}
+.action-card h3{font-size:16px;font-weight:700;margin-bottom:6px;}
+.action-card p{font-size:13px;color:var(--muted);line-height:1.5;}
+/* Plan cards */
+.plan-section{margin-bottom:24px;}
+.plan-section h2{font-size:16px;font-weight:700;margin-bottom:14px;}
+.plan-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+.plan-card.pro-active{border-color:var(--accent);background:linear-gradient(135deg,rgba(61,127,255,.06),var(--bg2));}
+.plan-info h3{font-size:17px;font-weight:800;margin-bottom:4px;}
+.plan-info p{font-size:13px;color:var(--muted);}
+.plan-features{list-style:none;margin-top:10px;}
+.plan-features li{font-size:13px;color:var(--muted);padding:3px 0;}
+.plan-features li::before{content:'✓ ';color:var(--green);font-weight:700;}
+.plan-features li.locked{opacity:.5;}
+.plan-features li.locked::before{content:'✕ ';color:var(--muted);}
+.btn-pro{background:var(--accent);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;padding:12px 24px;cursor:pointer;font-family:var(--font);transition:opacity .15s;box-shadow:0 4px 16px rgba(61,127,255,.3);white-space:nowrap;}
+.btn-pro:hover{opacity:.88;}
+.btn-manage{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:10px;font-size:14px;font-weight:700;padding:12px 24px;cursor:pointer;font-family:var(--font);transition:border-color .2s;white-space:nowrap;}
+.btn-manage:hover{border-color:var(--accent);}
+.badge-free{display:inline-block;background:rgba(107,119,153,.2);color:var(--muted);font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+.badge-pro{display:inline-block;background:rgba(61,127,255,.15);color:var(--accent);font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+.badge-beta{display:inline-block;background:rgba(139,92,246,.15);color:var(--purple);font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;vertical-align:middle;}
+.alert-box{border-radius:10px;padding:12px 16px;font-size:13px;margin-bottom:20px;display:none;}
+.alert-box.success{background:rgba(0,200,117,.1);border:1px solid rgba(0,200,117,.3);color:var(--green);}
+.alert-box.error{background:rgba(255,95,87,.1);border:1px solid rgba(255,95,87,.3);color:var(--red);}
+.loading-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:999;display:none;}
+.spinner{width:40px;height:40px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
 
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+</div>
+
 <nav>
   <a class="nav-logo" href="/">Time<span>Plan</span>.work</a>
   <div class="nav-right">
-    <span class="nav-user" id="nav-user">Chargement...</span>
-    <button class="btn-logout" onclick="logout()">Déconnexion</button>
+    <span class="nav-user" id="nav-user"></span>
+    <a href="/admin" class="btn-sm" id="admin-link" style="display:none">⚙️ Admin</a>
+    <button class="btn-sm" onclick="logout()" style="border-color:var(--red);color:var(--red)">Déconnexion</button>
   </div>
 </nav>
 
 <div class="main">
+
+  <div class="alert-box success" id="alert-success">✅ Abonnement Pro activé ! Bienvenue dans le plan Pro.</div>
+  <div class="alert-box error" id="alert-cancelled">Paiement annulé. Vous pouvez réessayer à tout moment.</div>
+
   <div class="welcome">
     <h1>Bonjour, <span id="user-name">...</span> 👋 <span id="plan-badge"></span></h1>
     <p id="user-email" style="color:var(--muted);font-size:14px;margin-top:4px"></p>
@@ -108,21 +94,21 @@ nav {
     </div>
     <div class="stat-card">
       <div class="label">Calculateur</div>
-      <div class="value green">Actif</div>
+      <div class="value green" id="stat-calc">—</div>
     </div>
     <div class="stat-card">
       <div class="label">Export PDF</div>
-      <div class="value" id="stat-pdf" style="font-size:16px;padding-top:6px">—</div>
+      <div class="value" id="stat-pdf" style="font-size:14px;padding-top:6px">—</div>
     </div>
   </div>
 
   <div class="actions">
-    <a href="/calculateur" class="action-card">
+    <a href="/calculateur" class="action-card" id="calc-card">
       <div class="icon">🕐</div>
       <h3>Calculateur d'heures</h3>
-      <p>Enregistrez vos heures réelles et calculez vos écarts journaliers.</p>
+      <p id="calc-desc">Enregistrez vos heures réelles et calculez vos écarts journaliers.</p>
     </a>
-    <div class="action-card" id="pdf-card" style="cursor:default">
+    <div class="action-card" id="pdf-card">
       <div class="icon">📄</div>
       <h3>Export PDF juridique</h3>
       <p id="pdf-desc">Générez un rapport complet pour votre avocat ou le Conseil de Prud'hommes.</p>
@@ -134,12 +120,50 @@ nav {
     </a>
   </div>
 
-  <div class="pro-banner" id="pro-banner" style="display:none">
-    <div>
-      <h3>Passez au plan Pro</h3>
-      <p>Export PDF juridique · Comparaison fiche de paie · Calcul de créance en euros</p>
+  <!-- SECTION PLAN -->
+  <div class="plan-section">
+    <h2>Mon abonnement</h2>
+
+    <!-- Plan Gratuit -->
+    <div class="plan-card" id="plan-free-card">
+      <div class="plan-info">
+        <h3>Plan Gratuit</h3>
+        <p>Accès de base au calculateur d'heures.</p>
+        <ul class="plan-features">
+          <li>Saisie heures illimitée</li>
+          <li>Calcul écart automatique</li>
+          <li>Export texte récapitulatif</li>
+          <li class="locked">Export PDF juridique</li>
+          <li class="locked">Comparaison fiche de paie</li>
+        </ul>
+      </div>
+      <button class="btn-pro" onclick="subscribePro()">⭐ Passer au Pro</button>
     </div>
-    <button class="btn-pro">Passer au Pro — 4,99€/mois</button>
+
+    <!-- Plan Pro -->
+    <div class="plan-card pro-active" id="plan-pro-card" style="display:none">
+      <div class="plan-info">
+        <h3>Plan Pro ⭐</h3>
+        <p id="pro-expires" style="color:var(--muted);font-size:13px;"></p>
+        <ul class="plan-features">
+          <li>Tout du plan Gratuit</li>
+          <li>Export PDF juridique complet</li>
+          <li>Comparaison fiche de paie</li>
+          <li>Calcul de créance en euros</li>
+          <li>Support prioritaire</li>
+        </ul>
+      </div>
+      <button class="btn-manage" onclick="manageSubscription()">Gérer l'abonnement</button>
+    </div>
+
+    <!-- Beta -->
+    <div class="plan-card" id="plan-beta-card" style="display:none;border-color:var(--purple)">
+      <div class="plan-info">
+        <h3>Accès Bêta 🧪</h3>
+        <p>Vous êtes bêta testeur — accès complet au calculateur.</p>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -147,41 +171,120 @@ nav {
 const token = localStorage.getItem('access_token');
 const user = JSON.parse(localStorage.getItem('user') || 'null');
 
-if (!token || !user) {
-  window.location.href = '/login';
+if (!token || !user) window.location.href = '/login';
+
+// Alertes URL params
+const params = new URLSearchParams(window.location.search);
+if (params.get('success') === '1') {
+  document.getElementById('alert-success').style.display = 'block';
+  window.history.replaceState({}, '', '/dashboard');
+}
+if (params.get('cancelled') === '1') {
+  document.getElementById('alert-cancelled').style.display = 'block';
+  window.history.replaceState({}, '', '/dashboard');
 }
 
+// Infos utilisateur
 document.getElementById('user-name').textContent = user.full_name || 'Utilisateur';
 document.getElementById('user-email').textContent = user.email;
 document.getElementById('nav-user').textContent = user.email;
+if (user.is_admin) document.getElementById('admin-link').style.display = 'inline-block';
 
-if (user.is_pro) {
-  document.getElementById('plan-badge').innerHTML = '<span class="badge-pro">Pro</span>';
-  document.getElementById('stat-plan').textContent = 'Pro';
-  document.getElementById('stat-pdf').textContent = '✅ Inclus';
-  document.getElementById('pdf-desc').textContent = 'Générez votre rapport PDF juridique complet en un clic.';
-  document.getElementById('pdf-card').style.cursor = 'pointer';
-  document.getElementById('pdf-card').onclick = () => alert('Export PDF — bientôt disponible !');
-} else {
-  document.getElementById('plan-badge').innerHTML = '<span class="badge-free">Gratuit</span>';
-  document.getElementById('stat-plan').textContent = 'Gratuit';
-  document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
-  document.getElementById('pdf-desc').textContent = 'Disponible avec le plan Pro. Passez au Pro pour débloquer cette fonctionnalité.';
-  document.getElementById('pro-banner').style.display = 'flex';
+// Charger le statut bêta depuis l'API
+async function loadStatus() {
+  try {
+    const res = await fetch('/api/beta/status', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+
+    if (user.is_pro || data.is_pro) {
+      // Plan Pro
+      document.getElementById('plan-badge').innerHTML = '<span class="badge-pro">Pro</span>';
+      document.getElementById('stat-plan').textContent = 'Pro';
+      document.getElementById('stat-calc').textContent = '✅ Actif';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--green)">✅ Inclus</span>';
+      document.getElementById('plan-free-card').style.display = 'none';
+      document.getElementById('plan-pro-card').style.display = 'flex';
+      document.getElementById('pdf-desc').textContent = 'Générez votre rapport PDF juridique complet en un clic.';
+      document.getElementById('pdf-card').style.cursor = 'pointer';
+      document.getElementById('pdf-card').onclick = () => alert('Export PDF — disponible prochainement !');
+    } else if (data.beta_status === 'approved') {
+      // Bêta
+      document.getElementById('plan-badge').innerHTML = '<span class="badge-beta">Bêta</span>';
+      document.getElementById('stat-plan').textContent = 'Bêta';
+      document.getElementById('stat-calc').textContent = '✅ Actif';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+      document.getElementById('plan-free-card').style.display = 'none';
+      document.getElementById('plan-beta-card').style.display = 'flex';
+    } else if (data.beta_status === 'pending') {
+      // En attente
+      document.getElementById('plan-badge').innerHTML = '<span class="badge-free">En attente</span>';
+      document.getElementById('stat-plan').textContent = 'Gratuit';
+      document.getElementById('stat-calc').textContent = '⏳ En attente';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+    } else {
+      // Gratuit
+      document.getElementById('plan-badge').innerHTML = '<span class="badge-free">Gratuit</span>';
+      document.getElementById('stat-plan').textContent = 'Gratuit';
+      document.getElementById('stat-calc').innerHTML = '<span style="color:var(--orange)">🔒 Bêta requis</span>';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+    }
+  } catch(e) {}
+}
+
+async function subscribePro() {
+  document.getElementById('loading').style.display = 'flex';
+  try {
+    const res = await fetch('/api/stripe/create-checkout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.checkout_url) {
+      window.location.href = data.checkout_url;
+    } else {
+      alert('Erreur lors de la création du paiement. Réessayez.');
+    }
+  } catch(e) {
+    alert('Erreur réseau. Réessayez.');
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+  }
+}
+
+async function manageSubscription() {
+  document.getElementById('loading').style.display = 'flex';
+  try {
+    const res = await fetch('/api/stripe/create-portal', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    });
+    const data = await res.json();
+    if (data.portal_url) {
+      window.location.href = data.portal_url;
+    }
+  } catch(e) {
+    alert('Erreur. Réessayez.');
+  } finally {
+    document.getElementById('loading').style.display = 'none';
+  }
 }
 
 async function logout() {
-  const refresh = localStorage.getItem('refresh_token');
   try {
     await fetch('/api/auth/logout', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refresh })
+      body: JSON.stringify({ refresh_token: localStorage.getItem('refresh_token') })
     });
   } catch(e) {}
   localStorage.clear();
   window.location.href = '/login';
 }
+
+loadStatus();
 </script>
 </body>
 </html>
