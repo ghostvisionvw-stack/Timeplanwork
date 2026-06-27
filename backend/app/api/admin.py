@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel
-from app.models.models import User, WorkDay, AuditLog, SubscriptionStatus, BetaStatus, UserGrade
+from app.models.models import User, WorkDay, AuditLog, SubscriptionStatus, BetaStatus, UserGrade, RefreshToken
 from app.api.auth import get_current_admin
 from app.core.database import get_db
 
@@ -51,17 +51,61 @@ async def list_users(
 
     total = q.count()
     users = q.order_by(desc(User.created_at)).offset((page-1)*per_page).limit(per_page).all()
-    return {
-        "total": total, "page": page, "per_page": per_page,
-        "users": [{
-            "id": u.id, "email": u.email, "full_name": u.full_name,
-            "is_active": u.is_active, "is_pro": u.is_pro,
+
+    result = []
+    for u in users:
+        # Dernière IP de connexion depuis les RefreshTokens
+        last_token = db.query(RefreshToken).filter(
+            RefreshToken.user_id == u.id,
+            RefreshToken.is_revoked == False
+        ).order_by(desc(RefreshToken.created_at)).first()
+
+        # Dernière IP depuis les AuditLogs
+        last_login_log = db.query(AuditLog).filter(
+            AuditLog.user_id == u.id,
+            AuditLog.action == "login_success"
+        ).order_by(desc(AuditLog.created_at)).first()
+
+        result.append({
+            "id": u.id,
+            "email": u.email,
+            "full_name": u.full_name,
+            "is_active": u.is_active,
+            "is_pro": u.is_pro,
             "subscription_status": u.subscription_status,
-            "beta_status": u.beta_status, "grade": u.grade,
+            "beta_status": u.beta_status,
+            "grade": u.grade,
             "lifetime_pro": u.lifetime_pro,
             "created_at": u.created_at.isoformat(),
             "last_login_at": u.last_login_at.isoformat() if u.last_login_at else None,
-        } for u in users]
+            "last_ip": last_login_log.ip_address if last_login_log else None,
+            "failed_login_count": u.failed_login_count,
+            "is_locked": u.is_locked,
+        })
+    return {"total": total, "page": page, "per_page": per_page, "users": result}
+
+# ── DÉTAIL UTILISATEUR ──
+@router.get("/users/{user_id}")
+async def get_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    logs = db.query(AuditLog).filter(AuditLog.user_id == user_id).order_by(desc(AuditLog.created_at)).limit(20).all()
+    ips = db.query(AuditLog.ip_address, AuditLog.created_at).filter(
+        AuditLog.user_id == user_id, AuditLog.action == "login_success"
+    ).order_by(desc(AuditLog.created_at)).limit(10).all()
+    return {
+        "id": user.id, "email": user.email, "full_name": user.full_name,
+        "is_active": user.is_active, "is_admin": user.is_admin, "is_pro": user.is_pro,
+        "subscription_status": user.subscription_status,
+        "beta_status": user.beta_status, "grade": user.grade,
+        "lifetime_pro": user.lifetime_pro,
+        "created_at": user.created_at.isoformat(),
+        "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "failed_login_count": user.failed_login_count,
+        "is_locked": user.is_locked,
+        "login_ips": [{"ip": ip, "at": at.isoformat()} for ip, at in ips],
+        "recent_activity": [{"action": l.action, "ip": l.ip_address, "at": l.created_at.isoformat()} for l in logs]
     }
 
 # ── DEMANDES BÊTA ──
@@ -70,8 +114,7 @@ async def beta_requests(db: Session = Depends(get_db), admin: User = Depends(get
     users = db.query(User).filter(User.beta_status == BetaStatus.PENDING).order_by(desc(User.created_at)).all()
     return {"requests": [{
         "id": u.id, "email": u.email, "full_name": u.full_name,
-        "beta_message": u.beta_message,
-        "created_at": u.created_at.isoformat(),
+        "beta_message": u.beta_message, "created_at": u.created_at.isoformat(),
     } for u in users]}
 
 @router.patch("/beta/{user_id}/approve")
@@ -106,12 +149,7 @@ async def set_grade(user_id: int, body: GradeRequest, db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Impossible de modifier votre propre grade.")
-    grade_map = {
-        "user": UserGrade.USER,
-        "beta": UserGrade.BETA,
-        "pro_lifetime": UserGrade.PRO_LIFETIME,
-        "admin": UserGrade.ADMIN,
-    }
+    grade_map = {"user": UserGrade.USER, "beta": UserGrade.BETA, "pro_lifetime": UserGrade.PRO_LIFETIME, "admin": UserGrade.ADMIN}
     if body.grade not in grade_map:
         raise HTTPException(status_code=400, detail="Grade invalide.")
     user.grade = grade_map[body.grade]
@@ -126,7 +164,7 @@ async def set_grade(user_id: int, body: GradeRequest, db: Session = Depends(get_
     db.commit()
     return {"message": f"Grade '{body.grade}' accordé à {user.email}"}
 
-# ── ACTIONS CLASSIQUES ──
+# ── ACTIONS ──
 @router.patch("/users/{user_id}/activate")
 async def toggle_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
     user = db.query(User).filter(User.id == user_id).first()
@@ -135,6 +173,9 @@ async def toggle_user(user_id: int, db: Session = Depends(get_db), admin: User =
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Impossible de modifier votre propre compte.")
     user.is_active = not user.is_active
+    # Si désactivé → révoquer tous les tokens
+    if not user.is_active:
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update({"is_revoked": True})
     db.commit()
     return {"message": f"Compte {'activé' if user.is_active else 'désactivé'}.", "is_active": user.is_active}
 
@@ -159,6 +200,21 @@ async def grant_pro(user_id: int, db: Session = Depends(get_db), admin: User = D
     db.commit()
     return {"message": f"Accès Pro 30 jours accordé à {user.email}"}
 
+# ── SUPPRIMER COMPTE ──
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    if user.id == admin.id:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer votre propre compte.")
+    if user.is_admin:
+        raise HTTPException(status_code=400, detail="Impossible de supprimer un compte admin.")
+    email = user.email
+    db.delete(user)
+    db.commit()
+    return {"message": f"Compte {email} supprimé définitivement."}
+
 # ── AUDIT LOGS ──
 @router.get("/audit-logs")
 async def audit_logs(
@@ -177,7 +233,11 @@ async def audit_logs(
         "at": l.created_at.isoformat()
     } for l in logs]}
 
-# ── VÉRIFICATION ACCÈS BÊTA (pour le frontend) ──
-@router.get("/check-access")
-async def check_beta_access(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-    return {"has_access": True}
+# ── STATS ──
+@router.get("/stats")
+async def stats(db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+    actions = db.query(AuditLog.action, func.count(AuditLog.id).label('count')).group_by(AuditLog.action).all()
+    return {
+        "actions": [{"action": a.action, "count": a.count} for a in actions],
+        "total_logs": db.query(func.count(AuditLog.id)).scalar(),
+    }
