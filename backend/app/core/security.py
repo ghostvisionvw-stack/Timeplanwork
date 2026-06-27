@@ -7,7 +7,6 @@ from passlib.context import CryptContext
 from app.core.config import settings
 
 # ── HACHAGE MOTS DE PASSE ──
-# bcrypt avec cost factor 12 — sécurité maximale
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto",
@@ -15,31 +14,21 @@ pwd_context = CryptContext(
 )
 
 def hash_password(password: str) -> str:
-    """Hache un mot de passe avec bcrypt (cost=12)."""
     return pwd_context.hash(password)
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Vérifie un mot de passe contre son hash bcrypt."""
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception:
+        return False
 
 def validate_password_strength(password: str) -> Tuple[bool, str]:
-    """
-    Valide la robustesse du mot de passe.
-    Règles : 8+ chars, 1 majuscule, 1 chiffre, 1 caractère spécial.
-    """
-    if len(password) < 8:
-        return False, "Le mot de passe doit contenir au moins 8 caractères."
-    if not any(c.isupper() for c in password):
-        return False, "Le mot de passe doit contenir au moins une majuscule."
-    if not any(c.isdigit() for c in password):
-        return False, "Le mot de passe doit contenir au moins un chiffre."
-    if not any(c in "!@#$%^&*()_+-=[]{}|;':\",./<>?" for c in password):
-        return False, "Le mot de passe doit contenir au moins un caractère spécial."
+    if len(password) < 6:
+        return False, "Le mot de passe doit contenir au moins 6 caractères."
     return True, "OK"
 
 # ── TOKENS JWT ──
 def create_access_token(user_id: int, email: str) -> str:
-    """Crée un token JWT d'accès (courte durée — 30 min)."""
     expire = datetime.now(timezone.utc) + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -49,12 +38,11 @@ def create_access_token(user_id: int, email: str) -> str:
         "type": "access",
         "exp": expire,
         "iat": datetime.now(timezone.utc),
-        "jti": secrets.token_hex(16),  # ID unique du token
+        "jti": secrets.token_hex(16),
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def create_refresh_token(user_id: int) -> str:
-    """Crée un refresh token (longue durée — 7 jours)."""
     expire = datetime.now(timezone.utc) + timedelta(
         days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
@@ -68,7 +56,6 @@ def create_refresh_token(user_id: int) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def decode_token(token: str) -> Optional[dict]:
-    """Décode et valide un token JWT. Retourne None si invalide."""
     try:
         payload = jwt.decode(
             token,
@@ -80,7 +67,6 @@ def decode_token(token: str) -> Optional[dict]:
         return None
 
 def create_reset_token(email: str) -> str:
-    """Crée un token de reset password (1 heure)."""
     expire = datetime.now(timezone.utc) + timedelta(hours=1)
     payload = {
         "sub": email,
@@ -91,15 +77,12 @@ def create_reset_token(email: str) -> str:
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 def verify_reset_token(token: str) -> Optional[str]:
-    """Vérifie un token de reset. Retourne l'email si valide."""
     payload = decode_token(token)
     if payload and payload.get("type") == "reset":
         return payload.get("sub")
     return None
 
-# ── SÉCURITÉ STRIPE WEBHOOK ──
 def verify_stripe_signature(payload: bytes, sig_header: str, secret: str) -> bool:
-    """Vérifie la signature HMAC d'un webhook Stripe."""
     import hmac
     try:
         elements = dict(e.split("=", 1) for e in sig_header.split(","))
