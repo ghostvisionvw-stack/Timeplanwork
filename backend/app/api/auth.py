@@ -1,7 +1,7 @@
 import hashlib
 import logging
-from datetime import datetime, timezone
-from fastapi import APIRouter, Depends, HTTPException, Request, status, BackgroundTasks
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr, field_validator
@@ -62,27 +62,37 @@ class NewPasswordRequest(BaseModel):
         return v
 
 # ── HELPER AUDIT ──
-def log_audit(db: Session, user_id: int | None, action: str, request: Request, details: str = None):
+def _get_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def _get_ua(request: Request) -> str:
+    return request.headers.get("user-agent", "")[:500]
+
+def log_audit(db: Session, user_id, action: str, request: Request, details: str = None):
+    """Enregistre une action dans l'audit log."""
     log = AuditLog(
         user_id=user_id,
         action=action,
-        ip_address=request.headers.get("x-forwarded-for", "").split(",")[0].strip() or (request.client.host if request.client else "unknown"),
-        user_agent=request.headers.get("user-agent", "")[:500],
+        ip_address=_get_ip(request),
+        user_agent=_get_ua(request),
         details=details
     )
     db.add(log)
+    # Log console aussi
+    user_info = f"user_id:{user_id}" if user_id else "anonymous"
+    logger.info(f"[AUDIT] {action} | {user_info} | ip:{_get_ip(request)}" + (f" | {details}" if details else ""))
 
 # ── REGISTER ──
 @router.post("/register", status_code=201)
 async def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
-    # Vérifier email existant (message générique pour éviter l'énumération d'emails)
     existing = db.query(User).filter(User.email == body.email.lower()).first()
     if existing:
-        # On renvoie la même réponse pour ne pas révéler si l'email existe
-        raise HTTPException(
-            status_code=400,
-            detail="Inscription impossible. Vérifiez vos informations."
-        )
+        log_audit(db, None, "register_duplicate", request, f"email:{body.email.lower()}")
+        db.commit()
+        raise HTTPException(status_code=400, detail="Inscription impossible. Vérifiez vos informations.")
 
     user = User(
         email=body.email.lower(),
@@ -94,62 +104,68 @@ async def register(body: RegisterRequest, request: Request, db: Session = Depend
     db.commit()
     db.refresh(user)
 
-    log_audit(db, user.id, "register", request)
+    log_audit(db, user.id, "register_success", request, f"email:{user.email}")
     db.commit()
 
-    logger.info(f"Nouveau compte créé: {user.email}")
+    logger.info(f"[NEW_USER] {user.email} | ip:{_get_ip(request)}")
     return {"message": "Compte créé. Bienvenue sur TimePlan.work !"}
 
 # ── LOGIN ──
 @router.post("/login")
 async def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email.lower()).first()
+    ip = _get_ip(request)
 
-    # ── Compte verrouillé ──
+    # Compte verrouillé
     if user and user.is_locked:
-        log_audit(db, user.id, "login_locked", request)
+        log_audit(db, user.id, "login_locked", request, f"email:{user.email}")
         db.commit()
+        logger.warning(f"[LOGIN_LOCKED] {user.email} | ip:{ip}")
         raise HTTPException(status_code=423, detail="Compte temporairement verrouillé. Réessayez plus tard.")
 
-    # ── Vérification (toujours même durée pour éviter timing attack) ──
+    # Vérification mot de passe
     if not user or not verify_password(body.password, user.hashed_password):
         if user:
             user.failed_login_count += 1
-            # Verrouillage après 5 échecs — 15 minutes
             if user.failed_login_count >= 5:
-                from datetime import timedelta
                 user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
-                logger.warning(f"Compte verrouillé après échecs: {user.email}")
-            log_audit(db, user.id, "login_failed", request)
+                logger.warning(f"[ACCOUNT_LOCKED] {user.email} | échecs:{user.failed_login_count} | ip:{ip}")
+                log_audit(db, user.id, "account_locked", request, f"attempts:{user.failed_login_count}")
+            else:
+                log_audit(db, user.id, "login_failed", request, f"attempt:{user.failed_login_count}")
             db.commit()
+            logger.warning(f"[LOGIN_FAILED] {user.email} | attempt:{user.failed_login_count} | ip:{ip}")
+        else:
+            logger.warning(f"[LOGIN_UNKNOWN] email:{body.email.lower()} | ip:{ip}")
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
 
-    # ── Compte inactif ──
+    # Compte inactif
     if not user.is_active:
+        log_audit(db, user.id, "login_inactive", request)
+        db.commit()
         raise HTTPException(status_code=403, detail="Compte désactivé. Contactez le support.")
 
-    # ── Succès — reset compteur échecs ──
+    # Succès
     user.failed_login_count = 0
     user.locked_until = None
     user.last_login_at = datetime.now(timezone.utc)
 
-    # ── Génération tokens ──
     access_token = create_access_token(user.id, user.email)
     refresh_token_raw = create_refresh_token(user.id)
 
-    # Stocker le HASH du refresh token (jamais le token brut)
     token_hash = hashlib.sha256(refresh_token_raw.encode()).hexdigest()
-    from datetime import timedelta
     rt = RefreshToken(
         user_id=user.id,
         token_hash=token_hash,
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        ip_address=request.headers.get("x-forwarded-for", "").split(",")[0].strip(),
-        user_agent=request.headers.get("user-agent", "")[:500]
+        ip_address=ip,
+        user_agent=_get_ua(request)
     )
     db.add(rt)
-    log_audit(db, user.id, "login_success", request)
+    log_audit(db, user.id, "login_success", request, f"email:{user.email}")
     db.commit()
+
+    logger.info(f"[LOGIN_OK] {user.email} | admin:{user.is_admin} | ip:{ip}")
 
     return {
         "access_token": access_token,
@@ -184,18 +200,17 @@ async def refresh_token(body: RefreshRequest, request: Request, db: Session = De
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="Utilisateur introuvable.")
 
-    # Rotation du refresh token (sécurité — invalide l'ancien)
     stored.is_revoked = True
     new_refresh_raw = create_refresh_token(user.id)
     new_hash = hashlib.sha256(new_refresh_raw.encode()).hexdigest()
-    from datetime import timedelta
     new_rt = RefreshToken(
         user_id=user.id,
         token_hash=new_hash,
         expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
-        ip_address=request.headers.get("x-forwarded-for", "").split(",")[0].strip(),
+        ip_address=_get_ip(request),
     )
     db.add(new_rt)
+    log_audit(db, user.id, "token_refresh", request)
     db.commit()
 
     return {
@@ -211,25 +226,23 @@ async def logout(body: RefreshRequest, request: Request, db: Session = Depends(g
     stored = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
     if stored:
         stored.is_revoked = True
-        user_id = stored.user_id
-        log_audit(db, user_id, "logout", request)
+        log_audit(db, stored.user_id, "logout", request)
         db.commit()
+        logger.info(f"[LOGOUT] user_id:{stored.user_id} | ip:{_get_ip(request)}")
     return {"message": "Déconnecté avec succès."}
 
 # ── RESET PASSWORD ──
 @router.post("/reset-password")
 async def request_reset(body: ResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == body.email.lower()).first()
-    # Toujours répondre pareil (pas d'énumération d'emails)
     if user and user.is_active:
         token = create_reset_token(user.email)
-        # TODO: envoyer email avec token
-        # background_tasks.add_task(send_reset_email, user.email, token)
-        logger.info(f"Reset password demandé pour: {user.email}")
+        logger.info(f"[RESET_PASSWORD_REQUEST] {user.email}")
+        # TODO: envoyer email
     return {"message": "Si cet email existe, un lien de réinitialisation vous a été envoyé."}
 
 @router.post("/reset-password/confirm")
-async def confirm_reset(body: NewPasswordRequest, db: Session = Depends(get_db)):
+async def confirm_reset(body: NewPasswordRequest, request: Request, db: Session = Depends(get_db)):
     email = verify_reset_token(body.token)
     if not email:
         raise HTTPException(status_code=400, detail="Lien invalide ou expiré.")
@@ -238,12 +251,13 @@ async def confirm_reset(body: NewPasswordRequest, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
     user.hashed_password = hash_password(body.new_password)
     user.password_changed_at = datetime.now(timezone.utc)
-    # Révoquer tous les refresh tokens existants
     db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update({"is_revoked": True})
+    log_audit(db, user.id, "password_reset", request)
     db.commit()
+    logger.info(f"[PASSWORD_RESET] {user.email}")
     return {"message": "Mot de passe modifié avec succès."}
 
-# ── DÉPENDANCE AUTH ──
+# ── DÉPENDANCES AUTH ──
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
