@@ -2,6 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pathlib import Path
@@ -29,23 +30,46 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.add_middleware(CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS, allow_credentials=True,
+# ── MIDDLEWARES ──
+
+# 1. Trusted Hosts
+if settings.ENVIRONMENT == "production":
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=[
+            "timeplanwork.com",
+            "www.timeplanwork.com",
+            "timeplanwork-production.up.railway.app",
+            "localhost",
+        ]
+    )
+
+# 2. CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS,
+    allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"], max_age=3600,
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+    max_age=3600,
 )
+
+# 3. Sécurité custom
 app.add_middleware(SecurityMiddleware)
 
+# ── ROUTES API ──
 app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(beta.router)
 app.include_router(stripe_webhook.router)
 app.include_router(workdays.router)
 
+# ── HEALTH CHECK ──
 @app.get("/health")
 async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
+# ── PAGES FRONTEND ──
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 @app.get("/")
@@ -72,5 +96,6 @@ async def dashboard_page():
 async def admin_page():
     return FileResponse(FRONTEND_DIR / "admin.html")
 
+# ── FICHIERS STATIQUES ──
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
