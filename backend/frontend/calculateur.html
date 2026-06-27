@@ -537,10 +537,35 @@ function ajouterJour() {
   document.getElementById('inp-date').value=d.toISOString().split('T')[0];
 }
 
-function supprimerJour(date) {
+async function supprimerJour(date) {
   if(!confirm('Supprimer cette journée ?'))return;
+
+  // Supprimer en local immédiatement
   jours=jours.filter(j=>j.date!==date);
-  sauvegarder(); syncDB(); rendreListe(); calculerTotaux();
+  sauvegarder(); rendreListe(); calculerTotaux();
+
+  // Supprimer en DB via DELETE
+  if(TOKEN) {
+    setSyncStatus('syncing');
+    try {
+      const res = await fetch('/api/workdays/'+date, {
+        method:'DELETE',
+        headers:{'Authorization':'Bearer '+TOKEN}
+      });
+      if(res.ok) {
+        setSyncStatus('ok');
+      } else {
+        const d = await res.json().catch(()=>({}));
+        setSyncStatus('error');
+        if(res.status !== 404) {
+          alert('Erreur suppression : '+(d.detail||'Réessayez.'));
+        }
+      }
+    } catch(e) {
+      setSyncStatus('error');
+      alert('Erreur réseau lors de la suppression. La journée a été retirée localement.');
+    }
+  }
 }
 
 // ── TOTAUX ──
