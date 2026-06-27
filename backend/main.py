@@ -62,8 +62,7 @@ async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 # ── PAGES FRONTEND ──
-# main.py est dans /app/backend/ → frontend est dans /app/frontend/
-FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
+FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 @app.get("/calculateur")
 async def calculateur():
@@ -71,10 +70,7 @@ async def calculateur():
 
 @app.get("/")
 async def root():
-    index = FRONTEND_DIR / "index.html"
-    if index.exists():
-        return FileResponse(index)
-    return {"message": "TimePlan.work API", "docs": "Accès restreint en production."}
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 # ── FICHIERS STATIQUES ──
 if FRONTEND_DIR.exists():
