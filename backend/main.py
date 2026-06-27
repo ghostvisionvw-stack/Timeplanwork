@@ -62,6 +62,7 @@ async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
 # ── PAGES FRONTEND ──
+# main.py est dans /app/backend/ → frontend est dans /app/frontend/
 FRONTEND_DIR = Path(__file__).parent.parent / "frontend"
 
 @app.get("/calculateur")
