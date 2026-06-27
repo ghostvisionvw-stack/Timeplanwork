@@ -241,3 +241,40 @@ async def stats(db: Session = Depends(get_db), admin: User = Depends(get_current
         "actions": [{"action": a.action, "count": a.count} for a in actions],
         "total_logs": db.query(func.count(AuditLog.id)).scalar(),
     }
+
+# ── SUPER-ADMIN : RÉVÉLER IP ──
+def get_current_superadmin(current_user: User = Depends(get_current_admin)) -> User:
+    if not current_user.is_superadmin:
+        raise HTTPException(status_code=403, detail="Accès réservé au super-administrateur.")
+    return current_user
+
+@router.get("/users/{user_id}/reveal-ip")
+async def reveal_ip(
+    user_id: int,
+    db: Session = Depends(get_db),
+    superadmin: User = Depends(get_current_superadmin)
+):
+    """Révèle les IPs réelles d'un utilisateur — super-admin uniquement. Logué."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    # Log chaque révélation d'IP
+    db.add(AuditLog(
+        user_id=superadmin.id,
+        action="ip_revealed",
+        details=f"IPs de user_id:{user_id} ({user.email}) révélées par superadmin"
+    ))
+    db.commit()
+
+    # Récupérer toutes les IPs de connexion
+    login_ips = db.query(AuditLog.ip_address, AuditLog.created_at).filter(
+        AuditLog.user_id == user_id,
+        AuditLog.action == "login_success"
+    ).order_by(desc(AuditLog.created_at)).limit(20).all()
+
+    return {
+        "user_id": user_id,
+        "email": user.email,
+        "ips": [{"ip": ip, "at": at.isoformat()} for ip, at in login_ips if ip]
+    }

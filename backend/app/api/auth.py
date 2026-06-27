@@ -177,6 +177,7 @@ async def login(body: LoginRequest, request: Request, db: Session = Depends(get_
             "full_name": user.full_name,
             "is_pro": user.is_pro,
             "is_admin": user.is_admin,
+            "is_superadmin": user.is_superadmin,
         }
     }
 

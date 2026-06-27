@@ -20,16 +20,16 @@ class DayType(str, enum.Enum):
     ECONOMIC_LEAVE = "economic_leave"
 
 class BetaStatus(str, enum.Enum):
-    NONE = "none"           # Pas de demande
-    PENDING = "pending"     # En attente de validation
-    APPROVED = "approved"   # Bêta accepté
-    REJECTED = "rejected"   # Refusé
+    NONE = "none"
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 class UserGrade(str, enum.Enum):
-    USER = "user"               # Utilisateur normal
-    BETA = "beta"               # Bêta testeur
-    PRO_LIFETIME = "pro_lifetime"  # Pro à vie
-    ADMIN = "admin"             # Administrateur
+    USER = "user"
+    BETA = "beta"
+    PRO_LIFETIME = "pro_lifetime"
+    ADMIN = "admin"
 
 class User(Base):
     __tablename__ = "users"
@@ -40,6 +40,7 @@ class User(Base):
     full_name           = Column(String(255), nullable=True)
     is_active           = Column(Boolean, default=True, nullable=False)
     is_admin            = Column(Boolean, default=False, nullable=False)
+    is_superadmin       = Column(Boolean, default=False, nullable=False)
     email_verified      = Column(Boolean, default=False, nullable=False)
 
     # Abonnement
@@ -50,13 +51,13 @@ class User(Base):
 
     # Bêta
     beta_status         = Column(SAEnum(BetaStatus), default=BetaStatus.NONE)
-    beta_message        = Column(Text, nullable=True)      # Message de candidature
+    beta_message        = Column(Text, nullable=True)
     beta_approved_at    = Column(DateTime(timezone=True), nullable=True)
-    beta_approved_by    = Column(Integer, nullable=True)   # ID admin
+    beta_approved_by    = Column(Integer, nullable=True)
 
     # Grade
     grade               = Column(SAEnum(UserGrade), default=UserGrade.USER)
-    lifetime_pro        = Column(Boolean, default=False)   # Pro à vie
+    lifetime_pro        = Column(Boolean, default=False)
 
     # Paramètres travail
     hourly_rate         = Column(Float, default=0.0)

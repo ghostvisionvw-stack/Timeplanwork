@@ -284,6 +284,8 @@ async function loadUsers(search='') {
   const d = await api(`/api/admin/users?page=${currentPage}&per_page=20${q}`);
   if (!d.users || d.users.length === 0) { wrap.innerHTML = '<div class="empty">Aucun utilisateur.</div>'; document.getElementById('pagination').style.display='none'; return; }
 
+  const isSuperAdmin = user.is_superadmin === true;
+
   wrap.innerHTML = `<table><thead><tr>
     <th>Email</th><th>Nom</th><th>Grade</th><th>Plan</th><th>Statut</th><th>Dernière IP</th><th>Inscription</th><th>Actions</th>
   </tr></thead><tbody>
@@ -293,7 +295,13 @@ async function loadUsers(search='') {
       <td><span class="badge ${u.grade==='beta'?'beta':u.lifetime_pro?'lifetime':u.grade==='admin'?'pro':'free'}">${u.grade||'user'}</span>${u.is_locked?'<span class="badge locked" style="margin-left:4px">🔒</span>':''}</td>
       <td><span class="badge ${u.is_pro?'pro':'free'}">${u.is_pro?'Pro':'Gratuit'}</span></td>
       <td><span class="badge ${u.is_active?'active':'inactive'}">${u.is_active?'Actif':'Inactif'}</span></td>
-      <td>${u.last_ip ? `<span class="ip-tag">${u.last_ip}</span>` : '<span style="color:var(--muted);font-size:12px">—</span>'}</td>
+      <td>
+        ${u.last_ip
+          ? (isSuperAdmin
+            ? `<span class="ip-tag" id="ip-${u.id}">***.***.***</span> <button class="action-btn" onclick="revealIP(${u.id})" title="Révéler l'IP" style="font-size:10px;padding:2px 6px;">👁</button>`
+            : `<span class="ip-tag">***.***.***</span>`)
+          : '<span style="color:var(--muted);font-size:12px">—</span>'}
+      </td>
       <td style="font-size:12px;color:var(--muted)">${new Date(u.created_at).toLocaleDateString('fr-BE')}</td>
       <td>
         <button class="action-btn success" onclick="grantPro(${u.id})">Pro 30j</button>
@@ -314,6 +322,29 @@ async function loadUsers(search='') {
 function changePage(dir) { currentPage+=dir; loadUsers(document.getElementById('search-input').value); }
 function searchUsers() { clearTimeout(searchTimer); searchTimer=setTimeout(()=>{currentPage=1;loadUsers(document.getElementById('search-input').value);},400); }
 
+// RÉVÉLER IP (super-admin uniquement)
+async function revealIP(userId) {
+  try {
+    const d = await api(`/api/admin/users/${userId}/reveal-ip`);
+    if (d.ips && d.ips.length > 0) {
+      const lastIP = d.ips[0].ip;
+      const el = document.getElementById('ip-' + userId);
+      if (el) {
+        el.textContent = lastIP;
+        el.style.background = 'rgba(255,107,53,0.15)';
+        el.style.color = 'var(--orange)';
+      }
+      // Afficher toutes les IPs
+      const allIPs = d.ips.map(i => `${i.ip} — ${new Date(i.at).toLocaleString('fr-BE')}`).join('\n');
+      alert(`IPs de connexion pour ${d.email}:\n\n${allIPs}\n\n⚠️ Cette action a été enregistrée dans les audit logs.`);
+    } else {
+      alert('Aucune IP de connexion enregistrée pour cet utilisateur.');
+    }
+  } catch(e) {
+    alert('Erreur lors de la récupération des IPs.');
+  }
+}
+
 // GRADES
 async function loadGrades(search='') {
   const wrap = document.getElementById('grades-table-wrap');
@@ -327,7 +358,7 @@ async function loadGrades(search='') {
       <td>${u.full_name||'—'}</td>
       <td><span class="badge ${u.grade==='beta'?'beta':u.lifetime_pro?'lifetime':u.grade==='admin'?'pro':'free'}">${u.grade||'user'}</span></td>
       <td><span class="badge ${u.beta_status==='approved'?'approved':u.beta_status==='pending'?'pending':u.beta_status==='rejected'?'rejected':'free'}">${u.beta_status||'none'}</span></td>
-      <td>${u.last_ip ? `<span class="ip-tag">${u.last_ip}</span>` : '—'}</td>
+      <td>${u.last_ip ? `<span class="ip-tag">${user.is_superadmin ? u.last_ip : '***.***.***'}</span>` : '—'}</td>
       <td>
         <select class="grade-select" onchange="setGrade(${u.id}, this.value)">
           <option value="">-- Choisir --</option>
@@ -397,7 +428,7 @@ async function loadLogs() {
     <div class="log-item">
       <span class="log-action">${l.action}</span>
       <span style="font-size:12px;color:var(--muted)">user #${l.user_id||'?'}</span>
-      ${l.ip_address ? `<span class="log-ip">${l.ip_address}</span>` : ''}
+      ${l.ip_address ? `<span class="log-ip">${user.is_superadmin ? l.ip_address : '***.***.***'}</span>` : ''}
       ${l.details ? `<span class="log-meta">${l.details}</span>` : ''}
       <span class="log-meta" style="margin-left:auto">${new Date(l.at).toLocaleString('fr-BE')}</span>
     </div>`).join('');
