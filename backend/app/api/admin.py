@@ -278,3 +278,64 @@ async def reveal_ip(
         "email": user.email,
         "ips": [{"ip": ip, "at": at.isoformat()} for ip, at in login_ips if ip]
     }
+
+# ── FEEDBACKS (admin) ──
+@router.get("/feedbacks")
+async def list_feedbacks(
+    page: int = Query(1, ge=1),
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
+    from app.api.feedback import Feedback
+    q = db.query(Feedback)
+    if status:
+        q = q.filter(Feedback.status == status)
+    total = q.count()
+    open_count = db.query(Feedback).filter(Feedback.status == "open").count()
+    fbs = q.order_by(desc(Feedback.created_at)).offset((page-1)*20).limit(20).all()
+    result = []
+    for f in fbs:
+        u = db.query(User).filter(User.id == f.user_id).first()
+        result.append({
+            "id": f.id, "user_email": u.email if u else "—", "user_name": u.full_name if u else "—",
+            "subject": f.subject, "message": f.message, "status": f.status,
+            "admin_reply": f.admin_reply, "created_at": f.created_at.isoformat(),
+            "replied_at": f.replied_at.isoformat() if f.replied_at else None,
+        })
+    return {"total": total, "open_count": open_count, "page": page, "feedbacks": result}
+
+class AdminReply(BaseModel):
+    reply: str
+    status: Optional[str] = "replied"
+
+@router.patch("/feedbacks/{feedback_id}/reply")
+async def admin_reply_feedback(
+    feedback_id: int, body: AdminReply,
+    db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+):
+    from app.api.feedback import Feedback
+    from datetime import datetime, timezone
+    fb = db.query(Feedback).filter(Feedback.id == feedback_id).first()
+    if not fb:
+        raise HTTPException(status_code=404, detail="Feedback introuvable.")
+    fb.admin_reply = body.reply.strip()
+    fb.admin_id = admin.id
+    fb.status = body.status if body.status in ["replied","closed"] else "replied"
+    fb.replied_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"message": "Réponse envoyée."}
+
+@router.patch("/feedbacks/{feedback_id}/status")
+async def set_feedback_status_admin(
+    feedback_id: int, status: str,
+    db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+):
+    from app.api.feedback import Feedback
+    if status not in ["open","replied","closed"]:
+        raise HTTPException(status_code=400, detail="Statut invalide.")
+    fb = db.query(Feedback).filter(Feedback.id == feedback_id).first()
+    if not fb:
+        raise HTTPException(status_code=404, detail="Feedback introuvable.")
+    fb.status = status; db.commit()
+    return {"message": f"Statut: {status}"}
