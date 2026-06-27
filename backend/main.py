@@ -9,7 +9,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.middleware import SecurityMiddleware
 from app.core.database import engine, Base
-from app.api import auth, admin, stripe_webhook, beta, workdays
+from app.api import auth, admin, stripe_webhook, beta, workdays, feedback
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -31,8 +31,6 @@ app = FastAPI(
 )
 
 # ── MIDDLEWARES ──
-
-# 1. Trusted Hosts
 if settings.ENVIRONMENT == "production":
     app.add_middleware(
         TrustedHostMiddleware,
@@ -44,7 +42,6 @@ if settings.ENVIRONMENT == "production":
         ]
     )
 
-# 2. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -54,7 +51,6 @@ app.add_middleware(
     max_age=3600,
 )
 
-# 3. Sécurité custom
 app.add_middleware(SecurityMiddleware)
 
 # ── ROUTES API ──
@@ -63,8 +59,9 @@ app.include_router(admin.router)
 app.include_router(beta.router)
 app.include_router(stripe_webhook.router)
 app.include_router(workdays.router)
+app.include_router(feedback.router)
 
-# ── HEALTH CHECK ──
+# ── HEALTH ──
 @app.get("/health")
 async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
@@ -96,6 +93,6 @@ async def dashboard_page():
 async def admin_page():
     return FileResponse(FRONTEND_DIR / "admin.html")
 
-# ── FICHIERS STATIQUES ──
+# ── STATIQUES ──
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
