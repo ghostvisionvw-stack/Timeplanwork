@@ -411,9 +411,6 @@ async def export_pdf(
                 md = mois_data[mk]
                 ecart_m = md["reelles"] - md["payees"]
                 ecart_col = GREEN if ecart_m > 0 else RED
-                c.setFillColor(MUTED); c.setFont('Helvetica', 6.5)
-                c.drawRightString(W-22*mm, row_y-1.5*mm,
-                    f'{md["jours"]}j | {mta(md["reelles"])} réelles | {mta(md["payees"])} déclarées | écart : ')
                 c.setFillColor(ecart_col); c.setFont('Helvetica-Bold', 6.5)
                 c.drawRightString(W-22*mm, row_y-1.5*mm,
                     f'{md["jours"]}j | {mta(md["reelles"])} réelles | {mta(md["payees"])} déclarées | écart : {mts(ecart_m)}')
