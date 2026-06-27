@@ -89,6 +89,26 @@ tr:hover td{background:rgba(255,255,255,.02);}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;}
 .btn-cancel{background:transparent;border:1px solid var(--border);color:var(--text);border-radius:8px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);}
 .btn-delete-confirm{background:var(--red);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:var(--font);}
+
+.fb-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:12px;}
+.fb-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.fb-subject{font-weight:700;font-size:14px;}
+.fb-meta{font-size:12px;color:var(--muted);}
+.fb-msg{font-size:13px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:10px 12px;margin:8px 0;line-height:1.5;font-style:italic;}
+.fb-reply-area{margin-top:10px;}
+.fb-reply-area textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:8px 12px;font-family:var(--font);outline:none;resize:vertical;min-height:70px;transition:border-color .2s;}
+.fb-reply-area textarea:focus{border-color:var(--accent);}
+.fb-reply-actions{display:flex;gap:8px;margin-top:8px;align-items:center;}
+.fb-existing-reply{background:rgba(61,127,255,.08);border:1px solid rgba(61,127,255,.2);border-radius:8px;padding:10px 12px;font-size:13px;color:var(--text);margin-top:8px;line-height:1.5;}
+.fb-existing-reply-label{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;margin-bottom:4px;}
+.status-open{background:rgba(255,107,53,.15);color:var(--orange);display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.status-replied{background:rgba(0,200,117,.15);color:var(--green);display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.status-closed{background:rgba(107,119,153,.15);color:var(--muted);display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;}
+.fb-filter{display:flex;gap:6px;margin-bottom:16px;}
+.fb-filter-btn{background:var(--bg3);border:1px solid var(--border);color:var(--muted);border-radius:20px;padding:5px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s;}
+.fb-filter-btn.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.btn-reply{background:var(--accent);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);}
+.btn-close-fb{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:13px;cursor:pointer;font-family:var(--font);}
 </style>
 </head>
 <body>
@@ -124,6 +144,7 @@ tr:hover td{background:rgba(255,255,255,.02);}
     <div class="sidebar-item" onclick="showSection('beta',this)" id="nav-beta">🧪 Demandes bêta<span class="badge-count" id="beta-count" style="display:none">0</span></div>
     <div class="sidebar-item" onclick="showSection('users',this)">👥 Utilisateurs</div>
     <div class="sidebar-item" onclick="showSection('grades',this)">⭐ Grades & Accès</div>
+    <div class="sidebar-item" onclick="showSection('support',this)" id="nav-support">💬 Support<span class="badge-count" id="support-count" style="display:none">0</span></div>
     <div class="sidebar-item" onclick="showSection('logs',this)">📋 Audit Logs</div>
   </div>
 
@@ -188,6 +209,19 @@ tr:hover td{background:rgba(255,255,255,.02);}
       </div>
     </div>
 
+
+    <!-- SUPPORT / FEEDBACKS -->
+    <div class="section" id="section-support">
+      <div class="section-title">Support & Feedbacks</div>
+      <div class="fb-filter">
+        <button class="fb-filter-btn active" onclick="filterFeedbacks('all',this)">Tous</button>
+        <button class="fb-filter-btn" onclick="filterFeedbacks('open',this)">🟠 En attente</button>
+        <button class="fb-filter-btn" onclick="filterFeedbacks('replied',this)">🟢 Répondus</button>
+        <button class="fb-filter-btn" onclick="filterFeedbacks('closed',this)">⚫ Fermés</button>
+      </div>
+      <div id="feedbacks-wrap"><div class="loading">Chargement...</div></div>
+    </div>
+
   </div>
 </div>
 
@@ -220,6 +254,7 @@ function showSection(name, el) {
   if (name === 'users') { currentPage = 1; loadUsers(); }
   if (name === 'grades') loadGrades();
   if (name === 'logs') loadLogs();
+  if (name === 'support') loadFeedbacks();
 }
 
 // DASHBOARD
@@ -238,6 +273,14 @@ async function loadDashboard() {
     document.getElementById('beta-count').textContent = d.beta.pending;
     document.getElementById('beta-count').style.display = 'inline-block';
   }
+  // Badge support
+  try {
+    const sf = await api('/api/admin/feedbacks?status=open');
+    if (sf.open_count > 0) {
+      document.getElementById('support-count').textContent = sf.open_count;
+      document.getElementById('support-count').style.display = 'inline-block';
+    }
+  } catch(e) {}
 }
 
 // BÊTA
@@ -432,6 +475,69 @@ async function loadLogs() {
       ${l.details ? `<span class="log-meta">${l.details}</span>` : ''}
       <span class="log-meta" style="margin-left:auto">${new Date(l.at).toLocaleString('fr-BE')}</span>
     </div>`).join('');
+}
+
+
+// SUPPORT / FEEDBACKS
+let fbFilter = 'all';
+
+async function loadFeedbacks() {
+  const wrap = document.getElementById('feedbacks-wrap');
+  wrap.innerHTML = '<div class="loading">Chargement...</div>';
+  const statusParam = fbFilter !== 'all' ? `&status=${fbFilter}` : '';
+  const d = await api(`/api/admin/feedbacks?page=1${statusParam}`);
+  if (!d.feedbacks || d.feedbacks.length === 0) {
+    wrap.innerHTML = '<div class="empty">✅ Aucun feedback ' + (fbFilter !== 'all' ? 'dans cette catégorie.' : 'pour le moment.') + '</div>';
+    return;
+  }
+  wrap.innerHTML = d.feedbacks.map(f => `
+    <div class="fb-card" id="fb-${f.id}">
+      <div class="fb-header">
+        <div>
+          <div class="fb-subject">${f.subject}</div>
+          <div class="fb-meta">De : <strong>${f.user_name || '—'}</strong> (${f.user_email}) · ${new Date(f.created_at).toLocaleString('fr-BE')}</div>
+        </div>
+        <span class="status-${f.status}">${f.status === 'open' ? '🟠 En attente' : f.status === 'replied' ? '🟢 Répondu' : '⚫ Fermé'}</span>
+      </div>
+      <div class="fb-msg">"${f.message}"</div>
+      ${f.admin_reply ? `
+        <div class="fb-existing-reply-label">💬 Votre réponse (${f.replied_at ? new Date(f.replied_at).toLocaleDateString('fr-BE') : ''})</div>
+        <div class="fb-existing-reply">${f.admin_reply}</div>
+      ` : ''}
+      <div class="fb-reply-area">
+        <textarea id="reply-${f.id}" placeholder="Écrire une réponse à ${f.user_name || f.user_email}...">${f.admin_reply || ''}</textarea>
+        <div class="fb-reply-actions">
+          <button class="btn-reply" onclick="sendReply(${f.id}, 'replied')">📨 Répondre</button>
+          <button class="btn-close-fb" onclick="sendReply(${f.id}, 'closed')">✅ Fermer</button>
+          ${f.status === 'closed' ? `<button class="btn-close-fb" onclick="setFbStatus(${f.id},'open')">🔄 Rouvrir</button>` : ''}
+        </div>
+      </div>
+    </div>`).join('');
+
+  // Mettre à jour badge
+  const openCount = d.feedbacks.filter(f => f.status === 'open').length;
+  const badge = document.getElementById('support-count');
+  if (d.open_count > 0) { badge.textContent = d.open_count; badge.style.display = 'inline-block'; }
+  else badge.style.display = 'none';
+}
+
+function filterFeedbacks(status, el) {
+  fbFilter = status;
+  document.querySelectorAll('.fb-filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  loadFeedbacks();
+}
+
+async function sendReply(id, status) {
+  const reply = document.getElementById('reply-' + id)?.value?.trim();
+  if (!reply) { alert('Veuillez écrire une réponse avant d\'envoyer.'); return; }
+  const d = await api(`/api/admin/feedbacks/${id}/reply`, 'PATCH', { reply, status });
+  if (d.message) loadFeedbacks();
+}
+
+async function setFbStatus(id, status) {
+  await api(`/api/admin/feedbacks/${id}/status?status=${status}`, 'PATCH');
+  loadFeedbacks();
 }
 
 // LOGOUT
