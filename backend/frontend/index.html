@@ -121,6 +121,94 @@ nav {
 .nav-dropdown .logout-item { color: var(--red); }
 .nav-user-info { padding: 10px 12px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 6px; }
 .nav-user-info strong { display: block; color: var(--text); font-size: 13px; }
+
+/* ── PANNEAU JURIDIQUE ── */
+.legal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  z-index: 300; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s;
+}
+.legal-overlay.open { opacity: 1; pointer-events: all; }
+.legal-panel {
+  position: fixed; top: 0; right: -520px; width: 100%; max-width: 520px;
+  height: 100vh; background: var(--bg2); border-left: 1px solid var(--border);
+  z-index: 301; transition: right 0.35s cubic-bezier(0.4,0,0.2,1);
+  display: flex; flex-direction: column;
+}
+.legal-panel.open { right: 0; }
+.legal-panel-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0;
+}
+.legal-panel-header h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
+.legal-panel-header p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.legal-close {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); width: 32px; height: 32px; border-radius: 8px;
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.legal-close:hover { border-color: var(--accent); }
+.legal-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+.legal-country-select {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 14px;
+  padding: 10px 12px; font-family: var(--font-body); outline: none;
+  margin-bottom: 20px; cursor: pointer;
+}
+.legal-country-select:focus { border-color: var(--accent); }
+.legal-section { margin-bottom: 16px; }
+.legal-section-title {
+  font-size: 13px; font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.legal-cp-item {
+  background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; margin-bottom: 8px; overflow: hidden;
+}
+.legal-cp-header {
+  padding: 12px 14px; cursor: pointer; display: flex;
+  align-items: center; justify-content: space-between;
+  font-size: 13px; font-weight: 600;
+  transition: background 0.15s;
+}
+.legal-cp-header:hover { background: rgba(61,127,255,0.06); }
+.legal-cp-chevron { font-size: 10px; color: var(--muted); transition: transform 0.2s; }
+.legal-cp-item.open .legal-cp-chevron { transform: rotate(180deg); }
+.legal-cp-body { display: none; padding: 0 14px 14px; }
+.legal-cp-item.open .legal-cp-body { display: block; }
+.legal-tag {
+  display: inline-block; font-size: 10px; font-weight: 700;
+  padding: 2px 8px; border-radius: 6px; margin-right: 4px; margin-bottom: 4px;
+}
+.legal-tag.green { background: rgba(0,200,117,0.15); color: var(--green); }
+.legal-tag.orange { background: rgba(255,107,53,0.15); color: var(--orange); }
+.legal-tag.blue { background: rgba(61,127,255,0.15); color: var(--accent); }
+.legal-info-row {
+  display: flex; gap: 10px; padding: 8px 0;
+  border-bottom: 1px solid var(--border); font-size: 12px;
+}
+.legal-info-row:last-child { border-bottom: none; }
+.legal-info-label { color: var(--muted); min-width: 140px; flex-shrink: 0; }
+.legal-info-val { color: var(--text); font-weight: 600; }
+.legal-disclaimer {
+  background: rgba(61,127,255,0.06); border: 1px solid rgba(61,127,255,0.2);
+  border-radius: 8px; padding: 10px 12px; font-size: 11px; color: var(--muted);
+  line-height: 1.6; margin-top: 20px;
+}
+.btn-legal {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 7px 14px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: border-color 0.2s;
+  display: flex; align-items: center; gap: 6px;
+}
+.btn-legal:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 768px) {
+  .legal-panel { max-width: 100%; }
+}
 .hero {
   min-height: 100vh;
   display: flex; align-items: center; justify-content: center;
@@ -336,6 +424,7 @@ footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4
   </a>
   <div class="nav-right">
     <button class="theme-toggle" onclick="toggleTheme()" title="Mode clair/sombre" aria-label="Changer de thème"></button>
+    <button class="btn-legal" onclick="openLegal()">⚖️ Ressources légales</button>
     <a href="/calculateur" class="nav-cta">Calculateur</a>
 
     <!-- MENU DÉROULANT -->
@@ -370,6 +459,36 @@ footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4
     </div>
   </div>
 </nav>
+
+<!-- ── PANNEAU JURIDIQUE ── -->
+<div class="legal-overlay" id="legal-overlay" onclick="closeLegal()"></div>
+<div class="legal-panel" id="legal-panel">
+  <div class="legal-panel-header">
+    <div>
+      <h2>⚖️ Ressources légales</h2>
+      <p>Conventions collectives par pays</p>
+    </div>
+    <button class="legal-close" onclick="closeLegal()">✕</button>
+  </div>
+  <div class="legal-body">
+    <select class="legal-country-select" id="legal-country" onchange="renderLegal()">
+      <option value="BE">🇧🇪 Belgique</option>
+      <option value="FR">🇫🇷 France</option>
+      <option value="LU">🇱🇺 Luxembourg</option>
+      <option value="NL">🇳🇱 Pays-Bas</option>
+      <option value="DE">🇩🇪 Allemagne</option>
+      <option value="ES">🇪🇸 Espagne</option>
+      <option value="IT">🇮🇹 Italie</option>
+      <option value="PT">🇵🇹 Portugal</option>
+      <option value="PL">🇵🇱 Pologne</option>
+      <option value="EU">🌍 Droit européen général</option>
+    </select>
+    <div id="legal-content"></div>
+    <div class="legal-disclaimer">
+      ⚠️ Ces informations sont fournies à titre indicatif. Elles ne constituent pas un avis juridique. Pour toute démarche légale, consultez un avocat spécialisé en droit du travail.
+    </div>
+  </div>
+</div>
 
 <section class="hero">
   <div class="hero-glow"></div>
@@ -507,7 +626,7 @@ footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4
           <li>Support prioritaire</li>
           <li>Accès multi-appareils</li>
         </ul>
-        <a href="/register" class="btn-featured" style="display:block;text-align:center;text-decoration:none">S'abonner →</a>
+        <a href="/calculateur" class="btn-featured" style="display:block;text-align:center;text-decoration:none">Essayer gratuitement →</a>
       </div>
     </div>
   </div>
@@ -623,7 +742,382 @@ async function logoutNav() {
   window.location.reload();
 }
 
-// ── SCROLL REVEAL ──
+// ── PANNEAU JURIDIQUE ──
+const LEGAL_DATA = {
+  BE: {
+    label: '🇧🇪 Belgique', loi: 'Loi du 16 mars 1971 sur le travail',
+    general: {
+      'Durée max hebdomadaire': '38h/sem (loi), peut varier selon CP',
+      'Heures sup majorées': '50% en semaine, 100% le dimanche/férié',
+      'Repos compensatoire': 'Obligatoire si dépassement interne',
+      'Préavis licenciement': 'Selon ancienneté (statut unique depuis 2014)',
+      'Salaire minimum': 'RMMMG — 2 070,48 €/mois (2024)',
+    },
+    conventions: [
+      { code:'CP 140.03', nom:'Transport et logistique', infos:{
+        'Secteur':'Chauffeurs, manutentionnaires, logistique',
+        'Durée de travail':'38h/sem ou 40h avec repos compensatoire',
+        'Heures sup semaine':'50% de majoration',
+        'Heures sup dimanche':'100% de majoration',
+        'Samedis':'Majoration selon accord d\'entreprise',
+        'Nuit (21h-6h)':'Majoration 20% minimum',
+        'Préavis ouvriers':'Selon loi statut unique',
+      }},
+      { code:'CP 200', nom:'Employés (général)', infos:{
+        'Secteur':'Employés non couverts par autre CP',
+        'Durée de travail':'38h/sem',
+        'Heures sup':'50% (jours ouvrables), 100% (dimanche/férié)',
+        'Chèques-repas':'8€/jour minimum',
+        'Eco-chèques':'250€/an',
+      }},
+      { code:'CP 100', nom:'Commission paritaire nationale auxiliaire', infos:{
+        'Secteur':'Ouvriers non couverts par autre CP',
+        'Durée de travail':'38h/sem',
+        'Heures sup':'50% / 100%',
+        'Petit chômage':'Selon loi',
+      }},
+      { code:'CP 111', nom:'Métallurgie — Fabrications métalliques', infos:{
+        'Secteur':'Usines métallurgiques, ateliers',
+        'Durée de travail':'38h/sem',
+        'Heures sup':'50% / 100%',
+        'Prime de nuit':'Selon accord sectoriel',
+        'Crédit-temps':'Droits spécifiques secteur',
+      }},
+      { code:'CP 124', nom:'Construction', infos:{
+        'Secteur':'Bâtiment, gros œuvre, travaux publics',
+        'Durée de travail':'38h/sem',
+        'Intempéries':'Chômage temporaire possible',
+        'Primes':'Prime de mobilité, salissures',
+        'Fonds de sécurité':'FSE Construction',
+      }},
+      { code:'CP 302', nom:'Hôtels, restaurants, cafés', infos:{
+        'Secteur':'Horeca, restauration, hébergement',
+        'Durée de travail':'38h/sem (flexibilité possible)',
+        'Pourboires':'Cotisations sociales spécifiques',
+        'Petit flexijobs':'Régime spécifique secteur',
+      }},
+    ]
+  },
+  FR: {
+    label: '🇫🇷 France', loi: 'Code du travail — Loi du 13 juin 1998 (35h)',
+    general: {
+      'Durée légale hebdomadaire': '35h/sem',
+      'Heures sup (8 premières)': 'Majoration 25%',
+      'Heures sup (au-delà)': 'Majoration 50%',
+      'Contingent annuel': '220h (au-delà : contrepartie repos obligatoire)',
+      'SMIC': '11,65 €/h brut (2024)',
+      'Repos quotidien': '11h consécutives minimum',
+      'Repos hebdomadaire': '24h + 11h = 35h consécutives',
+    },
+    conventions: [
+      { code:'SYNTEC', nom:'Bureaux d\'études / Ingénierie', infos:{
+        'Secteur':'ESN, consulting, bureaux d\'études',
+        'Forfait jours':'218 jours/an pour cadres',
+        'RTT':'Jours de réduction du temps de travail',
+        'Classification':'Positionnement 1.1 à 3.3',
+        'Ticket restaurant':'Participation employeur 60%',
+      }},
+      { code:'Transport routier', nom:'Transport routier de marchandises', infos:{
+        'Secteur':'Chauffeurs PL, livreurs, logistique',
+        'Durée max semaine':'48h (56h exceptionnellement)',
+        'Temps de conduite':'9h/jour (10h max 2x/sem)',
+        'Coupures':'45min après 4h30 de conduite',
+        'Nuit':'Majoration 25% (entre 22h et 5h)',
+        'Grands déplacements':'Indemnités spécifiques',
+      }},
+      { code:'BTP', nom:'Bâtiment et travaux publics', infos:{
+        'Secteur':'Construction, gros œuvre, second œuvre',
+        'Indemnités':'Petits déplacements, repas, trajet',
+        'Intempéries':'Chômage intempéries indemnisé',
+        'Congés payés':'CIBTP (caisse spécifique)',
+        'Prime d\'ancienneté':'Selon ancienneté',
+      }},
+      { code:'Commerce', nom:'Commerce de détail et de gros', infos:{
+        'Secteur':'Distribution, grande surface, commerce',
+        'Durée':'35h, modulation possible',
+        'Dimanche':'Volontariat + majoration selon zone',
+        'Travail de nuit':'Majoration 10 à 15%',
+      }},
+    ]
+  },
+  LU: {
+    label: '🇱🇺 Luxembourg', loi: 'Code du travail luxembourgeois',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem',
+      'Heures sup majoration': '40% minimum',
+      'Repos compensatoire': 'Possible en lieu de majoration',
+      'Salaire minimum': '2 570,93 €/mois (2024)',
+      'Congés légaux': '26 jours ouvrables',
+      'Index': 'Salaires indexés sur l\'inflation',
+    },
+    conventions: [
+      { code:'CCT Générale', nom:'Convention collective générale', infos:{
+        'Application':'Tous secteurs sauf exceptions',
+        'Heures sup':'40% de majoration',
+        'Nuit (22h-6h)':'15% de majoration',
+        'Dimanche':'70% de majoration',
+        'Préavis':'2 à 6 mois selon ancienneté',
+      }},
+      { code:'CCT Construction', nom:'Construction', infos:{
+        'Secteur':'Bâtiment, génie civil',
+        'Indemnités':'Déplacement, panier repas',
+        'Intempéries':'Chômage partiel possible',
+      }},
+    ]
+  },
+  NL: {
+    label: '🇳🇱 Pays-Bas', loi: 'Arbeidstijdenwet (loi sur le temps de travail)',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem (max légal)',
+      'Heures max par jour': '12h/jour',
+      'Repos quotidien': '11h consécutives',
+      'Salaire minimum (WML)': '13,27 €/h (2024)',
+      'Congés légaux': '4x la durée hebdomadaire',
+      'Vakantiegeld': 'Prime de vacances 8% du salaire annuel',
+    },
+    conventions: [
+      { code:'CAO Metalektro', nom:'Métallurgie et électrotechnique', infos:{
+        'Secteur':'Industrie métallurgique et électronique',
+        'Durée travail':'40h/sem',
+        'Heures sup':'130% (première heure), 150% ensuite',
+        'Prime de nuit':'Selon accord d\'entreprise',
+      }},
+      { code:'CAO Bouw', nom:'Construction (Bouw & Infra)', infos:{
+        'Secteur':'BTP, génie civil',
+        'Durée travail':'40h/sem',
+        'Heures supplémentaires':'150%',
+        'Fonds de retraite':'BPF Bouw',
+      }},
+      { code:'CAO Transport', nom:'Transport et logistique', infos:{
+        'Secteur':'Chauffeurs PL, messagerie',
+        'Durée conduite':'Max 9h/jour (UE)',
+        'Heures sup':'125 à 150%',
+      }},
+    ]
+  },
+  DE: {
+    label: '🇩🇪 Allemagne', loi: 'Arbeitszeitgesetz (ArbZG)',
+    general: {
+      'Durée légale quotidienne': '8h/jour (10h max exceptionnellement)',
+      'Durée hebdomadaire max': '48h en moyenne sur 6 mois',
+      'Repos quotidien': '11h consécutives',
+      'Salaire minimum (Mindestlohn)': '12,41 €/h (2024)',
+      'Congés légaux': '24 jours ouvrables minimum',
+      'Dimanches/Fériés': 'Travail généralement interdit sauf exceptions',
+    },
+    conventions: [
+      { code:'TV Metall', nom:'Tarifvertrag Metall (IG Metall)', infos:{
+        'Secteur':'Industrie métallurgique et électrique',
+        'Durée travail':'35h/sem (accord historique)',
+        'Heures sup':'125 à 150%',
+        'Compte épargne temps':'Possible',
+        'Prime annuelle':'Selon accord d\'entreprise',
+      }},
+      { code:'TV Bau', nom:'Bâtiment (Bauhauptgewerbe)', infos:{
+        'Secteur':'Construction, gros œuvre',
+        'Durée travail':'40h/sem',
+        'Intempéries':'Chômage partiel (Kurzarbeit)',
+        'Congés payés':'ULAK (caisse spécifique)',
+      }},
+      { code:'TV Transport', nom:'Transport routier', infos:{
+        'Secteur':'Chauffeurs, logistique',
+        'Durée conduite':'Règlement EU 561/2006',
+        'Salaire minimum sectoriel':'Applicable aux étrangers travaillant en Allemagne',
+      }},
+    ]
+  },
+  ES: {
+    label: '🇪🇸 Espagne', loi: 'Estatuto de los Trabajadores',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem',
+      'Heures sup annuelles max': '80h/an',
+      'Majoration heures sup': '25% minimum (ou récupération)',
+      'SMI (salaire minimum)': '1 134 €/mois (2024)',
+      'Congés légaux': '30 jours calendaires',
+      'Repos hebdomadaire': '1,5 jours consécutifs minimum',
+    },
+    conventions: [
+      { code:'CC Metal', nom:'Convenio Metal', infos:{
+        'Secteur':'Industrie métallurgique',
+        'Durée travail':'40h/sem',
+        'Heures sup':'Majorées ou récupérées',
+        'Prime d\'ancienneté':'Trienios selon convention',
+      }},
+      { code:'CC Transporte', nom:'Transporte de mercancías por carretera', infos:{
+        'Secteur':'Transport routier de marchandises',
+        'Durée conduite':'Règlement UE 561/2006',
+        'Dietas':'Indemnités de déplacement',
+        'Plus nocturnidad':'20% pour travail de nuit',
+      }},
+      { code:'CC Construcción', nom:'Sector de la construcción', infos:{
+        'Secteur':'BTP',
+        'Durée travail':'40h/sem',
+        'Plus distancia':'Indemnité de déplacement',
+      }},
+    ]
+  },
+  IT: {
+    label: '🇮🇹 Italie', loi: 'D.Lgs. 66/2003 — Codice Civile',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem',
+      'Heures sup annuelles max': '250h/an',
+      'Majoration heures sup': '15 à 50% selon convention',
+      'Salaire minimum': 'Fixé par CCNL (pas de SMIC national)',
+      'Congés légaux': '4 semaines minimum',
+      'Tredicesima': '13ème mois obligatoire',
+    },
+    conventions: [
+      { code:'CCNL Metalmeccanici', nom:'Métallurgie et mécanique', infos:{
+        'Secteur':'Industrie mécanique, automobile',
+        'Durée travail':'40h/sem',
+        'Heures sup':'Majorées 15 à 50%',
+        'Quattordicesima':'14ème mois selon accord',
+      }},
+      { code:'CCNL Trasporti', nom:'Transport et logistique', infos:{
+        'Secteur':'Transport routier, logistique',
+        'Durée conduite':'Règlement UE 561/2006',
+        'Indennità di trasferta':'Indemnités de déplacement',
+      }},
+    ]
+  },
+  PT: {
+    label: '🇵🇹 Portugal', loi: 'Código do Trabalho (Lei 7/2009)',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem',
+      'Heures sup (1ère heure)': '+25%',
+      'Heures sup (heures suivantes)': '+37,5%',
+      'Heures sup jour de repos': '+50%',
+      'Salaire minimum (SMN)': '820 €/mois (2024)',
+      'Congés légaux': '22 jours ouvrables',
+      'Subsídio de férias': 'Prime de vacances = 1 mois de salaire',
+    },
+    conventions: [
+      { code:'CCT Metal', nom:'Metalurgia e Metalomecânica', infos:{
+        'Secteur':'Industrie métallurgique',
+        'Durée travail':'40h/sem',
+        'Horas extraordinárias':'+25% / +37,5%',
+      }},
+      { code:'CCT Construção', nom:'Construção Civil', infos:{
+        'Secteur':'BTP',
+        'Subsídio de alimentação':'Ticket repas',
+        'Subsídio de férias':'Obligatoire',
+      }},
+    ]
+  },
+  PL: {
+    label: '🇵🇱 Pologne', loi: 'Kodeks pracy (Code du travail polonais)',
+    general: {
+      'Durée légale hebdomadaire': '40h/sem',
+      'Heures sup annuelles max': '150h/an (ou plus par accord)',
+      'Majoration nuit et dimanche': '+100%',
+      'Majoration autres heures sup': '+50%',
+      'Salaire minimum (płaca minimalna)': '4 242 PLN/mois (2024)',
+      'Congés légaux': '20 ou 26 jours (selon ancienneté)',
+    },
+    conventions: [
+      { code:'Układ zbiorowy', nom:'Convention collective d\'entreprise', infos:{
+        'Application':'Négociée au niveau de l\'entreprise ou du secteur',
+        'Heures sup':'150% ou 200% selon moment',
+        'Nuit (21h-7h)':'Supplément obligatoire',
+      }},
+    ]
+  },
+  EU: {
+    label: '🌍 Droit européen général', loi: 'Directive 2003/88/CE — Temps de travail',
+    general: {
+      'Durée max hebdomadaire': '48h/sem (moyenne sur 4 mois)',
+      'Repos quotidien': '11h consécutives minimum',
+      'Repos hebdomadaire': '24h + 11h = 35h consécutives',
+      'Congés annuels': '4 semaines minimum',
+      'Pauses': '20min si journée > 6h',
+      'Travail de nuit': 'Max 8h/24h en moyenne',
+      'Transport routier': 'Règlement CE 561/2006 (tachygraphe)',
+    },
+    conventions: [
+      { code:'Directive 2003/88/CE', nom:'Directive temps de travail', infos:{
+        'Application':'Tous les États membres de l\'UE',
+        'Opt-out':'Certains pays permettent dérogation individuelle (ex: UK avant Brexit)',
+        'Secteurs exclus':'Transport aérien, mer, pêche ont leurs propres règles',
+        'Recours':'Saisir la juridiction prud\'homale nationale',
+      }},
+      { code:'Règlement CE 561/2006', nom:'Transport routier (tachygraphe)', infos:{
+        'Conduite journalière':'9h max (10h max 2x/sem)',
+        'Conduite hebdomadaire':'56h max',
+        'Repos journalier':'11h consécutives (ou 3+9h fractionné)',
+        'Repos hebdomadaire':'45h consécutives (réduction 24h possible)',
+        'Pause':'45min après 4h30 de conduite',
+        'Tachygraphe':'Obligatoire > 3,5T',
+      }},
+    ]
+  },
+};
+
+function openLegal() {
+  document.getElementById('legal-overlay').classList.add('open');
+  document.getElementById('legal-panel').classList.add('open');
+  document.body.style.overflow = 'hidden';
+  renderLegal();
+}
+
+function closeLegal() {
+  document.getElementById('legal-overlay').classList.remove('open');
+  document.getElementById('legal-panel').classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+function renderLegal() {
+  const pays = document.getElementById('legal-country').value;
+  const data = LEGAL_DATA[pays];
+  if (!data) return;
+  const content = document.getElementById('legal-content');
+
+  let html = `<div class="legal-section">
+    <div class="legal-section-title">📋 Loi applicable</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">${data.loi}</div>
+    <div class="legal-section-title">📊 Règles générales</div>`;
+
+  Object.entries(data.general).forEach(([k,v]) => {
+    html += `<div class="legal-info-row">
+      <span class="legal-info-label">${k}</span>
+      <span class="legal-info-val">${v}</span>
+    </div>`;
+  });
+
+  html += `</div><div class="legal-section">
+    <div class="legal-section-title">📁 Conventions collectives principales</div>`;
+
+  data.conventions.forEach((conv, i) => {
+    html += `<div class="legal-cp-item" id="cp-${pays}-${i}">
+      <div class="legal-cp-header" onclick="toggleCP('cp-${pays}-${i}')">
+        <div>
+          <span class="legal-tag blue">${conv.code}</span>
+          <span style="font-size:13px;color:var(--text)">${conv.nom}</span>
+        </div>
+        <span class="legal-cp-chevron">▼</span>
+      </div>
+      <div class="legal-cp-body">`;
+    Object.entries(conv.infos).forEach(([k,v]) => {
+      html += `<div class="legal-info-row">
+        <span class="legal-info-label">${k}</span>
+        <span class="legal-info-val">${v}</span>
+      </div>`;
+    });
+    html += `</div></div>`;
+  });
+
+  html += `</div>`;
+  content.innerHTML = html;
+}
+
+function toggleCP(id) {
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+// Fermer avec Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLegal();
+});
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
