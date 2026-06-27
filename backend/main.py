@@ -37,8 +37,6 @@ app = FastAPI(
 )
 
 # ── MIDDLEWARES ──
-
-# 1. CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -47,8 +45,6 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
     max_age=3600,
 )
-
-# 2. Sécurité custom
 app.add_middleware(SecurityMiddleware)
 
 # ── ROUTES API ──
@@ -64,13 +60,29 @@ async def health():
 # ── PAGES FRONTEND ──
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
+@app.get("/")
+async def root():
+    return FileResponse(FRONTEND_DIR / "index.html")
+
 @app.get("/calculateur")
 async def calculateur():
     return FileResponse(FRONTEND_DIR / "calculateur.html")
 
-@app.get("/")
-async def root():
-    return FileResponse(FRONTEND_DIR / "index.html")
+@app.get("/login")
+async def login_page():
+    return FileResponse(FRONTEND_DIR / "login.html")
+
+@app.get("/register")
+async def register_page():
+    return FileResponse(FRONTEND_DIR / "register.html")
+
+@app.get("/dashboard")
+async def dashboard_page():
+    return FileResponse(FRONTEND_DIR / "dashboard.html")
+
+@app.get("/admin")
+async def admin_page():
+    return FileResponse(FRONTEND_DIR / "admin.html")
 
 # ── FICHIERS STATIQUES ──
 if FRONTEND_DIR.exists():

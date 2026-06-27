@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inscription — TimePlan.work</title>
+<style>
+:root {
+  --bg: #0b0e18; --bg2: #131728; --bg3: #1c2136;
+  --border: #252d4a; --text: #e8edf8; --muted: #6b7799;
+  --accent: #3d7fff; --green: #00c875; --red: #ff5f57;
+  --font: 'Inter', system-ui, sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font); min-height: 100vh;
+  display: flex; align-items: center; justify-content: center; padding: 24px;
+}
+.card {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 40px 36px;
+  width: 100%; max-width: 420px;
+}
+.logo { text-align: center; margin-bottom: 32px; }
+.logo a { text-decoration: none; font-size: 22px; font-weight: 900; color: var(--text); letter-spacing: -0.5px; }
+.logo a span { color: var(--accent); }
+.logo p { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.field { margin-bottom: 16px; }
+label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+input {
+  width: 100%; background: var(--bg3); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text); font-size: 15px;
+  padding: 12px 14px; font-family: var(--font); outline: none; transition: border-color 0.2s;
+}
+input:focus { border-color: var(--accent); }
+.btn {
+  width: 100%; background: var(--accent); color: #fff; border: none;
+  border-radius: 10px; font-size: 15px; font-weight: 700;
+  padding: 13px; cursor: pointer; font-family: var(--font);
+  margin-top: 8px; transition: opacity 0.15s;
+}
+.btn:hover { opacity: 0.88; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.error-msg {
+  background: rgba(255,95,87,0.1); border: 1px solid rgba(255,95,87,0.3);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px;
+  color: var(--red); margin-bottom: 16px; display: none;
+}
+.success-msg {
+  background: rgba(0,200,117,0.1); border: 1px solid rgba(0,200,117,0.3);
+  border-radius: 8px; padding: 10px 14px; font-size: 13px;
+  color: var(--green); margin-bottom: 16px; display: none;
+}
+.links { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
+.links a { color: var(--accent); text-decoration: none; }
+.divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+.note { font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center; line-height: 1.5; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">
+    <a href="/">Time<span>Plan</span>.work</a>
+    <p>Créez votre compte gratuit</p>
+  </div>
+
+  <div class="error-msg" id="error-msg"></div>
+  <div class="success-msg" id="success-msg"></div>
+
+  <div class="field">
+    <label>Nom complet</label>
+    <input type="text" id="full_name" placeholder="Jean Dupont" autocomplete="name" />
+  </div>
+  <div class="field">
+    <label>Email</label>
+    <input type="email" id="email" placeholder="votre@email.com" autocomplete="email" />
+  </div>
+  <div class="field">
+    <label>Mot de passe</label>
+    <input type="password" id="password" placeholder="Min. 8 caractères" autocomplete="new-password" />
+  </div>
+
+  <button class="btn" id="btn-register" onclick="register()">Créer mon compte →</button>
+  <p class="note">100% gratuit · Aucune carte bancaire · Résiliable à tout moment</p>
+
+  <hr class="divider">
+  <div class="links">
+    Déjà un compte ? <a href="/login">Se connecter</a>
+  </div>
+</div>
+
+<script>
+async function register() {
+  const full_name = document.getElementById('full_name').value.trim();
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const btn = document.getElementById('btn-register');
+
+  hideMessages();
+
+  if (!full_name || !email || !password) {
+    showError('Veuillez remplir tous les champs.');
+    return;
+  }
+
+  if (password.length < 8) {
+    showError('Le mot de passe doit contenir au moins 8 caractères.');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Création...';
+
+  try {
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ full_name, email, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      showError(data.detail || 'Erreur lors de l\'inscription.');
+      return;
+    }
+
+    showSuccess('Compte créé ! Redirection vers la connexion...');
+    setTimeout(() => window.location.href = '/login', 2000);
+
+  } catch (e) {
+    showError('Erreur réseau. Réessayez.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Créer mon compte →';
+  }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error-msg');
+  el.textContent = msg; el.style.display = 'block';
+}
+function showSuccess(msg) {
+  const el = document.getElementById('success-msg');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideMessages() {
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('success-msg').style.display = 'none';
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Enter') register(); });
+</script>
+</body>
+</html>
