@@ -8,8 +8,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.middleware import SecurityMiddleware
 from app.core.database import engine, Base
-from app.api import auth, admin, stripe_webhook
-from app.api import beta
+from app.api import auth, admin, stripe_webhook, beta, workdays
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -41,6 +40,7 @@ app.include_router(auth.router)
 app.include_router(admin.router)
 app.include_router(beta.router)
 app.include_router(stripe_webhook.router)
+app.include_router(workdays.router)
 
 @app.get("/health")
 async def health():

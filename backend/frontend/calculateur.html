@@ -153,7 +153,10 @@
   <div class="list-card">
     <div class="list-header">
       <h2>📋 Historique</h2>
-      <button class="btn-export" onclick="toggleExport()">Exporter</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-export" onclick="toggleExport()">📋 Export texte</button>
+        <button class="btn-export" onclick="exportPDF()" style="border-color:var(--accent);color:var(--accent)">📄 Export PDF ⭐</button>
+      </div>
     </div>
     <div class="filter-bar" id="filter-bar">
       <button class="filter-chip active" onclick="filtrer('tous', this)">Tous</button>
@@ -218,9 +221,92 @@ async function requestBeta() {
   } catch(e) { btn.disabled=false; btn.textContent="Demander l'accès bêta"; }
 }
 
+// ── API SYNC ──
+const TOKEN = localStorage.getItem('access_token');
+
+async function syncDB() {
+  if (!TOKEN) return;
+  const payload = jours.map(j => ({
+    date: j.date,
+    day_type: j.type || 'travail',
+    start_time: j.debut || null,
+    end_time: j.fin || null,
+    real_minutes: j.reellesMin || 0,
+    paid_minutes: j.payeesMin || 0,
+    gap_minutes: j.ecartMin || 0,
+    note: j.note || null,
+  }));
+  try {
+    await fetch('/api/workdays/sync', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ days: payload })
+    });
+  } catch(e) {}
+}
+
+async function loadFromDB() {
+  if (!TOKEN) return;
+  try {
+    const res = await fetch('/api/workdays/', { headers: { 'Authorization': 'Bearer ' + TOKEN } });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.days && data.days.length > 0) {
+      // Convertir format DB → format local
+      const dbJours = data.days.map(d => {
+        const typeMap = { work: 'travail', saturday: 'samedi', economic_leave: 'chomage' };
+        return {
+          date: d.date,
+          type: typeMap[d.day_type] || d.day_type,
+          debut: d.start_time,
+          fin: d.end_time,
+          reellesMin: d.real_minutes,
+          payeesMin: d.paid_minutes,
+          ecartMin: d.gap_minutes,
+          note: d.note,
+        };
+      });
+      // Fusionner avec localStorage (DB prioritaire)
+      jours = dbJours;
+      sauvegarder();
+      rendreListe();
+      calculerTotaux();
+    }
+  } catch(e) {}
+}
+
+async function exportPDF() {
+  try {
+    const res = await fetch('/api/workdays/export/pdf', {
+      headers: { 'Authorization': 'Bearer ' + TOKEN }
+    });
+    if (res.status === 402) {
+      alert('⭐ L\'export PDF est réservé aux abonnés Pro. Passez au Pro depuis votre dashboard.');
+      return;
+    }
+    if (!res.ok) {
+      const d = await res.json();
+      alert(d.detail || 'Erreur lors de la génération du PDF.');
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `TimePlan_Rapport_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) {
+    alert('Erreur réseau. Réessayez.');
+  }
+}
+
 // Calculateur
 let jours = JSON.parse(localStorage.getItem('heures_dacol') || '[]');
 let filtreActif = 'tous';
+
+// Charger depuis DB au démarrage
+loadFromDB();
 
 document.getElementById('inp-date').value = new Date().toISOString().split('T')[0];
 document.getElementById('inp-type').addEventListener('change', function() {
@@ -269,7 +355,7 @@ function ajouterJour() {
   }
   jours.push(entree);
   jours.sort((a,b)=>a.date.localeCompare(b.date));
-  sauvegarder(); rendreListe(); calculerTotaux();
+  sauvegarder(); syncDB(); rendreListe(); calculerTotaux();
   document.getElementById('inp-fin').value='';
   document.getElementById('inp-note').value='';
   document.getElementById('inp-paye').value='8';
@@ -284,7 +370,7 @@ function ajouterJour() {
 function supprimerJour(date) {
   if(!confirm('Supprimer cette journée ?'))return;
   jours=jours.filter(j=>j.date!==date);
-  sauvegarder(); rendreListe(); calculerTotaux();
+  sauvegarder(); syncDB(); rendreListe(); calculerTotaux();
 }
 
 function calculerTotaux() {
