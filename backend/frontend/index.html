@@ -86,6 +86,41 @@ nav {
   transition: opacity 0.15s;
 }
 .nav-cta:hover { opacity: 0.85; }
+
+/* ── MENU DÉROULANT ── */
+.nav-menu { position: relative; }
+.nav-menu-btn {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--text); border-radius: 8px; padding: 7px 14px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  font-family: var(--font-body); transition: border-color 0.2s;
+}
+.nav-menu-btn:hover { border-color: var(--accent); }
+.nav-menu-btn .chevron { font-size: 10px; transition: transform 0.2s; }
+.nav-menu.open .nav-menu-btn .chevron { transform: rotate(180deg); }
+.nav-dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 12px; padding: 8px;
+  min-width: 200px; box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: none; z-index: 200;
+}
+.nav-menu.open .nav-dropdown { display: block; }
+.nav-dropdown a, .nav-dropdown button {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 10px 12px; border-radius: 8px;
+  font-size: 14px; color: var(--text); text-decoration: none;
+  background: transparent; border: none; cursor: pointer;
+  font-family: var(--font-body); transition: background 0.15s;
+  text-align: left;
+}
+.nav-dropdown a:hover, .nav-dropdown button:hover { background: var(--bg3); }
+.nav-dropdown .divider { height: 1px; background: var(--border); margin: 6px 0; }
+.nav-dropdown .admin-item { color: var(--orange); }
+.nav-dropdown .logout-item { color: var(--red); }
+.nav-user-info { padding: 10px 12px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); margin-bottom: 6px; }
+.nav-user-info strong { display: block; color: var(--text); font-size: 13px; }
 .hero {
   min-height: 100vh;
   display: flex; align-items: center; justify-content: center;
@@ -301,7 +336,38 @@ footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4
   </a>
   <div class="nav-right">
     <button class="theme-toggle" onclick="toggleTheme()" title="Mode clair/sombre" aria-label="Changer de thème"></button>
-    <a href="/calculateur" class="nav-cta">Ouvrir le calculateur</a>
+    <a href="/calculateur" class="nav-cta">Calculateur</a>
+
+    <!-- MENU DÉROULANT -->
+    <div class="nav-menu" id="nav-menu">
+      <button class="nav-menu-btn" onclick="toggleMenu()">
+        <span id="menu-label">Mon compte</span>
+        <span class="chevron">▼</span>
+      </button>
+      <div class="nav-dropdown" id="nav-dropdown">
+        <!-- Non connecté -->
+        <div id="menu-guest">
+          <a href="/login">🔑 Se connecter</a>
+          <a href="/register">✨ Créer un compte</a>
+        </div>
+        <!-- Connecté -->
+        <div id="menu-logged" style="display:none">
+          <div class="nav-user-info">
+            <strong id="menu-username"></strong>
+            <span id="menu-plan"></span>
+          </div>
+          <a href="/dashboard">🏠 Mon dashboard</a>
+          <a href="/calculateur">🕐 Calculateur</a>
+          <!-- Admin uniquement -->
+          <div id="menu-admin-item" style="display:none">
+            <div class="divider"></div>
+            <a href="/admin" class="admin-item">⚙️ Administration</a>
+          </div>
+          <div class="divider"></div>
+          <button class="logout-item" onclick="logoutNav()">🚪 Déconnexion</button>
+        </div>
+      </div>
+    </div>
   </div>
 </nav>
 
@@ -501,6 +567,7 @@ footer { background: var(--bg2); border-top: 1px solid var(--border); padding: 4
 </footer>
 
 <script>
+// ── THEME ──
 function toggleTheme() {
   const html = document.documentElement;
   html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
@@ -509,12 +576,54 @@ function toggleTheme() {
 const saved = localStorage.getItem('tp-theme');
 if (saved) document.documentElement.dataset.theme = saved;
 
+// ── FAQ ──
 function toggleFaq(el) {
   const isOpen = el.classList.contains('open');
   document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
   if (!isOpen) el.classList.add('open');
 }
 
+// ── MENU DÉROULANT ──
+function toggleMenu() {
+  document.getElementById('nav-menu').classList.toggle('open');
+}
+
+// Fermer si clic ailleurs
+document.addEventListener('click', e => {
+  const menu = document.getElementById('nav-menu');
+  if (!menu.contains(e.target)) menu.classList.remove('open');
+});
+
+// ── ÉTAT CONNEXION ──
+const user = JSON.parse(localStorage.getItem('user') || 'null');
+const token = localStorage.getItem('access_token');
+
+if (user && token) {
+  document.getElementById('menu-guest').style.display = 'none';
+  document.getElementById('menu-logged').style.display = 'block';
+  document.getElementById('menu-label').textContent = user.full_name || 'Mon compte';
+  document.getElementById('menu-username').textContent = user.full_name || user.email;
+  document.getElementById('menu-plan').textContent = user.is_pro ? '⭐ Plan Pro' : '🆓 Plan Gratuit';
+
+  if (user.is_admin) {
+    document.getElementById('menu-admin-item').style.display = 'block';
+  }
+}
+
+async function logoutNav() {
+  const refresh = localStorage.getItem('refresh_token');
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refresh })
+    });
+  } catch(e) {}
+  localStorage.clear();
+  window.location.reload();
+}
+
+// ── SCROLL REVEAL ──
 const observer = new IntersectionObserver((entries) => {
   entries.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); }
