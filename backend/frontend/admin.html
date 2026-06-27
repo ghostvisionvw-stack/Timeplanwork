@@ -6,146 +6,89 @@
 <title>Admin — TimePlan.work</title>
 <style>
 :root {
-  --bg: #0b0e18; --bg2: #131728; --bg3: #1c2136;
-  --border: #252d4a; --text: #e8edf8; --muted: #6b7799;
-  --accent: #3d7fff; --green: #00c875; --red: #ff5f57; --orange: #ff6b35;
-  --font: 'Inter', system-ui, sans-serif;
+  --bg:#0b0e18;--bg2:#131728;--bg3:#1c2136;--border:#252d4a;
+  --text:#e8edf8;--muted:#6b7799;--accent:#3d7fff;--green:#00c875;
+  --red:#ff5f57;--orange:#ff6b35;--purple:#8b5cf6;
+  --font:'Inter',system-ui,sans-serif;
 }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
-
-/* NAV */
-nav {
-  background: var(--bg2); border-bottom: 1px solid var(--border);
-  padding: 0 24px; height: 60px;
-  display: flex; align-items: center; justify-content: space-between;
-  position: sticky; top: 0; z-index: 100;
-}
-.nav-logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; text-decoration: none; color: var(--text); }
-.nav-logo span { color: var(--accent); }
-.nav-badge {
-  background: rgba(255,107,53,0.15); color: var(--orange);
-  font-size: 10px; font-weight: 700; padding: 2px 8px;
-  border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; margin-left: 8px;
-}
-.nav-right { display: flex; align-items: center; gap: 12px; }
-.nav-user { font-size: 13px; color: var(--muted); }
-.btn-sm {
-  background: transparent; border: 1px solid var(--border);
-  color: var(--muted); border-radius: 8px; padding: 6px 14px;
-  font-size: 13px; cursor: pointer; font-family: var(--font);
-  transition: border-color 0.2s; text-decoration: none; display: inline-block;
-}
-.btn-sm:hover { border-color: var(--accent); color: var(--accent); }
-
-/* LAYOUT */
-.layout { display: flex; min-height: calc(100vh - 60px); }
-.sidebar {
-  width: 220px; background: var(--bg2); border-right: 1px solid var(--border);
-  padding: 24px 16px; flex-shrink: 0;
-  position: sticky; top: 60px; height: calc(100vh - 60px); overflow-y: auto;
-}
-.sidebar-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 16px 0 8px; }
-.sidebar-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 9px 12px; border-radius: 8px; cursor: pointer;
-  font-size: 14px; color: var(--muted); transition: background 0.15s, color 0.15s;
-  margin-bottom: 2px;
-}
-.sidebar-item:hover { background: var(--bg3); color: var(--text); }
-.sidebar-item.active { background: rgba(61,127,255,0.12); color: var(--accent); font-weight: 600; }
-.main { flex: 1; padding: 28px 28px; overflow-x: hidden; }
-
-/* SECTIONS */
-.section { display: none; }
-.section.active { display: block; }
-.section-title { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 20px; }
-
-/* STATS GRID */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 28px; }
-.stat-card {
-  background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 14px; padding: 20px;
-}
-.stat-card .lbl { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
-.stat-card .val { font-size: 32px; font-weight: 900; letter-spacing: -1px; }
-.stat-card .val.green { color: var(--green); }
-.stat-card .val.accent { color: var(--accent); }
-.stat-card .val.orange { color: var(--orange); }
-
-/* TABLE */
-.table-wrap { background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; margin-bottom: 20px; }
-.table-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
-.table-header h3 { font-size: 15px; font-weight: 700; }
-.search-input {
-  background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
-  color: var(--text); font-size: 13px; padding: 8px 12px;
-  font-family: var(--font); outline: none; width: 220px;
-  transition: border-color 0.2s;
-}
-.search-input:focus { border-color: var(--accent); }
-table { width: 100%; border-collapse: collapse; }
-th {
-  text-align: left; font-size: 11px; font-weight: 700;
-  color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
-  padding: 12px 20px; border-bottom: 1px solid var(--border);
-  background: var(--bg3);
-}
-td { padding: 12px 20px; font-size: 13px; border-bottom: 1px solid var(--border); }
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: rgba(255,255,255,0.02); }
-
-.badge {
-  display: inline-block; font-size: 10px; font-weight: 700;
-  padding: 2px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px;
-}
-.badge.pro { background: rgba(61,127,255,0.15); color: var(--accent); }
-.badge.free { background: rgba(107,119,153,0.15); color: var(--muted); }
-.badge.active { background: rgba(0,200,117,0.15); color: var(--green); }
-.badge.inactive { background: rgba(255,95,87,0.15); color: var(--red); }
-
-.action-btn {
-  background: transparent; border: 1px solid var(--border);
-  color: var(--muted); border-radius: 6px; padding: 4px 10px;
-  font-size: 11px; cursor: pointer; font-family: var(--font);
-  transition: all 0.15s; margin-right: 4px;
-}
-.action-btn:hover { border-color: var(--accent); color: var(--accent); }
-.action-btn.danger:hover { border-color: var(--red); color: var(--red); }
-.action-btn.success:hover { border-color: var(--green); color: var(--green); }
-
-/* PAGINATION */
-.pagination { display: flex; align-items: center; gap: 8px; padding: 16px 20px; }
-.page-btn {
-  background: var(--bg3); border: 1px solid var(--border);
-  color: var(--text); border-radius: 6px; padding: 6px 12px;
-  font-size: 13px; cursor: pointer; font-family: var(--font);
-}
-.page-btn:hover { border-color: var(--accent); }
-.page-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.page-info { font-size: 13px; color: var(--muted); }
-
-/* LOGS */
-.log-item {
-  padding: 12px 16px; border-bottom: 1px solid var(--border);
-  font-size: 13px; display: flex; gap: 16px; align-items: flex-start;
-}
-.log-item:last-child { border-bottom: none; }
-.log-action {
-  font-weight: 700; min-width: 140px; font-size: 12px;
-  font-family: monospace; color: var(--accent);
-}
-.log-meta { color: var(--muted); font-size: 12px; }
-
-/* EMPTY */
-.empty { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; }
-
-/* LOADING */
-.loading { padding: 40px; text-align: center; color: var(--muted); }
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh;}
+nav{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 24px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;}
+.nav-logo{font-size:18px;font-weight:900;letter-spacing:-.5px;text-decoration:none;color:var(--text);}
+.nav-logo span{color:var(--accent);}
+.nav-badge{background:rgba(255,107,53,.15);color:var(--orange);font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;margin-left:8px;}
+.nav-right{display:flex;align-items:center;gap:12px;}
+.nav-user{font-size:13px;color:var(--muted);}
+.btn-sm{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:var(--font);transition:border-color .2s;text-decoration:none;display:inline-block;}
+.btn-sm:hover{border-color:var(--accent);color:var(--accent);}
+.layout{display:flex;min-height:calc(100vh - 60px);}
+.sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);padding:24px 16px;flex-shrink:0;position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;}
+.sidebar-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin:16px 0 8px;}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted);transition:background .15s,color .15s;margin-bottom:2px;position:relative;}
+.sidebar-item:hover{background:var(--bg3);color:var(--text);}
+.sidebar-item.active{background:rgba(61,127,255,.12);color:var(--accent);font-weight:600;}
+.badge-count{position:absolute;right:10px;background:var(--orange);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;}
+.main{flex:1;padding:28px;overflow-x:hidden;}
+.section{display:none;}.section.active{display:block;}
+.section-title{font-size:20px;font-weight:800;letter-spacing:-.5px;margin-bottom:20px;}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:28px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;}
+.stat-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.stat-card .val{font-size:28px;font-weight:900;letter-spacing:-1px;}
+.val.green{color:var(--green);}.val.accent{color:var(--accent);}.val.orange{color:var(--orange);}.val.purple{color:var(--purple);}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:20px;}
+.table-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+.table-header h3{font-size:15px;font-weight:700;}
+.search-input{background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:8px 12px;font-family:var(--font);outline:none;width:220px;transition:border-color .2s;}
+.search-input:focus{border-color:var(--accent);}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg3);}
+td{padding:12px 20px;font-size:13px;border-bottom:1px solid var(--border);}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:rgba(255,255,255,.02);}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;text-transform:uppercase;letter-spacing:.5px;}
+.badge.pro{background:rgba(61,127,255,.15);color:var(--accent);}
+.badge.free{background:rgba(107,119,153,.15);color:var(--muted);}
+.badge.beta{background:rgba(139,92,246,.15);color:var(--purple);}
+.badge.lifetime{background:rgba(255,107,53,.15);color:var(--orange);}
+.badge.active{background:rgba(0,200,117,.15);color:var(--green);}
+.badge.inactive{background:rgba(255,95,87,.15);color:var(--red);}
+.badge.pending{background:rgba(255,107,53,.15);color:var(--orange);}
+.badge.approved{background:rgba(0,200,117,.15);color:var(--green);}
+.badge.rejected{background:rgba(255,95,87,.15);color:var(--red);}
+.action-btn{background:transparent;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:4px 10px;font-size:11px;cursor:pointer;font-family:var(--font);transition:all .15s;margin-right:4px;}
+.action-btn:hover{border-color:var(--accent);color:var(--accent);}
+.action-btn.danger:hover{border-color:var(--red);color:var(--red);}
+.action-btn.success:hover{border-color:var(--green);color:var(--green);}
+.action-btn.purple:hover{border-color:var(--purple);color:var(--purple);}
+.pagination{display:flex;align-items:center;gap:8px;padding:16px 20px;}
+.page-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:6px;padding:6px 12px;font-size:13px;cursor:pointer;font-family:var(--font);}
+.page-btn:hover{border-color:var(--accent);}
+.page-btn:disabled{opacity:.4;cursor:not-allowed;}
+.page-info{font-size:13px;color:var(--muted);}
+.log-item{padding:12px 16px;border-bottom:1px solid var(--border);font-size:13px;display:flex;gap:16px;align-items:flex-start;}
+.log-item:last-child{border-bottom:none;}
+.log-action{font-weight:700;min-width:140px;font-size:12px;font-family:monospace;color:var(--accent);}
+.log-meta{color:var(--muted);font-size:12px;}
+.empty{padding:40px;text-align:center;color:var(--muted);font-size:14px;}
+.loading{padding:40px;text-align:center;color:var(--muted);}
+/* Beta card */
+.beta-card{background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:12px;}
+.beta-card .bc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+.beta-card .bc-name{font-weight:700;font-size:15px;}
+.beta-card .bc-email{font-size:12px;color:var(--muted);margin-top:2px;}
+.beta-card .bc-msg{font-size:13px;color:var(--muted);background:var(--bg3);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-style:italic;}
+.beta-card .bc-actions{display:flex;gap:8px;}
+.btn-approve{background:var(--green);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:opacity .15s;}
+.btn-approve:hover{opacity:.85;}
+.btn-reject{background:transparent;border:1px solid var(--red);color:var(--red);border-radius:8px;padding:7px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--font);transition:background .15s;}
+.btn-reject:hover{background:rgba(255,95,87,.1);}
+/* Grade selector */
+.grade-select{background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:4px 8px;font-family:var(--font);outline:none;cursor:pointer;}
+.alert{background:rgba(0,200,117,.1);border:1px solid rgba(0,200,117,.3);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--green);margin-bottom:16px;display:none;}
 </style>
 </head>
 <body>
-
 <nav>
   <div style="display:flex;align-items:center;gap:8px">
     <a class="nav-logo" href="/">Time<span>Plan</span>.work</a>
@@ -159,36 +102,41 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 </nav>
 
 <div class="layout">
-  <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="sidebar-label">Navigation</div>
-    <div class="sidebar-item active" onclick="showSection('dashboard', this)">📊 Dashboard</div>
-    <div class="sidebar-item" onclick="showSection('users', this)">👥 Utilisateurs</div>
-    <div class="sidebar-item" onclick="showSection('logs', this)">📋 Audit Logs</div>
+    <div class="sidebar-item active" onclick="showSection('dashboard',this)">📊 Dashboard</div>
+    <div class="sidebar-item" onclick="showSection('beta',this)" id="nav-beta">
+      🧪 Demandes bêta
+      <span class="badge-count" id="beta-count" style="display:none">0</span>
+    </div>
+    <div class="sidebar-item" onclick="showSection('users',this)">👥 Utilisateurs</div>
+    <div class="sidebar-item" onclick="showSection('grades',this)">⭐ Grades & Accès</div>
+    <div class="sidebar-item" onclick="showSection('logs',this)">📋 Audit Logs</div>
   </div>
 
-  <!-- MAIN -->
   <div class="main">
 
     <!-- DASHBOARD -->
     <div class="section active" id="section-dashboard">
       <div class="section-title">Dashboard</div>
-      <div class="stats-grid" id="stats-grid">
-        <div class="loading">Chargement...</div>
-      </div>
+      <div class="stats-grid" id="stats-grid"><div class="loading">Chargement...</div></div>
     </div>
 
-    <!-- USERS -->
+    <!-- DEMANDES BÊTA -->
+    <div class="section" id="section-beta">
+      <div class="section-title">Demandes d'accès bêta</div>
+      <div id="beta-wrap"><div class="loading">Chargement...</div></div>
+    </div>
+
+    <!-- UTILISATEURS -->
     <div class="section" id="section-users">
       <div class="section-title">Utilisateurs</div>
       <div class="table-wrap">
         <div class="table-header">
           <h3>Liste des comptes</h3>
-          <input class="search-input" id="search-input" placeholder="🔍 Rechercher email ou nom..." oninput="searchUsers()" />
+          <input class="search-input" id="search-input" placeholder="🔍 Rechercher..." oninput="searchUsers()" />
         </div>
-        <div id="users-table-wrap">
-          <div class="loading">Chargement...</div>
-        </div>
+        <div id="users-table-wrap"><div class="loading">Chargement...</div></div>
         <div class="pagination" id="pagination" style="display:none">
           <button class="page-btn" id="btn-prev" onclick="changePage(-1)">← Précédent</button>
           <span class="page-info" id="page-info"></span>
@@ -197,7 +145,28 @@ tr:hover td { background: rgba(255,255,255,0.02); }
       </div>
     </div>
 
-    <!-- LOGS -->
+    <!-- GRADES & ACCÈS -->
+    <div class="section" id="section-grades">
+      <div class="section-title">Grades & Accès spéciaux</div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <h3>Gérer les grades</h3>
+          <input class="search-input" id="grade-search" placeholder="🔍 Rechercher..." oninput="searchGrades()" />
+        </div>
+        <div id="grades-table-wrap"><div class="loading">Chargement...</div></div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px;margin-top:16px;">
+        <h3 style="margin-bottom:12px;font-size:15px;">Légende des grades</h3>
+        <div style="display:grid;gap:8px;">
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;"><span class="badge free">USER</span> Compte standard — accès calculateur verrouillé</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;"><span class="badge beta">BETA</span> Bêta testeur — accès complet au calculateur</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;"><span class="badge lifetime">PRO À VIE</span> Accès Pro permanent sans abonnement</div>
+          <div style="display:flex;align-items:center;gap:10px;font-size:13px;"><span class="badge pro">ADMIN</span> Accès administrateur complet</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AUDIT LOGS -->
     <div class="section" id="section-logs">
       <div class="section-title">Audit Logs</div>
       <div class="table-wrap">
@@ -212,179 +181,203 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 <script>
 const token = localStorage.getItem('access_token');
 const user = JSON.parse(localStorage.getItem('user') || 'null');
-
-if (!token || !user || !user.is_admin) {
-  window.location.href = '/login';
-}
-
+if (!token || !user || !user.is_admin) window.location.href = '/login';
 document.getElementById('nav-user').textContent = user.email;
 
 let currentPage = 1;
+let gradeCurrentPage = 1;
 let searchTimer = null;
 
-// ── API HELPER ──
-async function api(url) {
-  const res = await fetch(url, {
-    headers: { 'Authorization': 'Bearer ' + token }
-  });
+async function api(url, method='GET', body=null) {
+  const opts = { method, headers: { 'Authorization': 'Bearer ' + token } };
+  if (body) { opts.headers['Content-Type'] = 'application/json'; opts.body = JSON.stringify(body); }
+  const res = await fetch(url, opts);
   if (res.status === 401) { localStorage.clear(); window.location.href = '/login'; }
   return res.json();
 }
 
-// ── NAVIGATION ──
 function showSection(name, el) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.sidebar-item').forEach(s => s.classList.remove('active'));
   document.getElementById('section-' + name).classList.add('active');
   el.classList.add('active');
-
   if (name === 'dashboard') loadDashboard();
+  if (name === 'beta') loadBeta();
   if (name === 'users') { currentPage = 1; loadUsers(); }
+  if (name === 'grades') { gradeCurrentPage = 1; loadGrades(); }
   if (name === 'logs') loadLogs();
 }
 
 // ── DASHBOARD ──
 async function loadDashboard() {
-  const data = await api('/api/admin/dashboard');
+  const d = await api('/api/admin/dashboard');
   document.getElementById('stats-grid').innerHTML = `
-    <div class="stat-card"><div class="lbl">Utilisateurs total</div><div class="val accent">${data.users.total}</div></div>
-    <div class="stat-card"><div class="lbl">Abonnés Pro</div><div class="val green">${data.users.pro}</div></div>
-    <div class="stat-card"><div class="lbl">Comptes gratuits</div><div class="val">${data.users.free}</div></div>
-    <div class="stat-card"><div class="lbl">Nouveaux aujourd'hui</div><div class="val accent">${data.users.new_today}</div></div>
-    <div class="stat-card"><div class="lbl">MRR estimé</div><div class="val orange">${data.mrr_estimate}€</div></div>
-    <div class="stat-card"><div class="lbl">Journées enregistrées</div><div class="val">${data.work_days.total}</div></div>
+    <div class="stat-card"><div class="lbl">Utilisateurs total</div><div class="val accent">${d.users.total}</div></div>
+    <div class="stat-card"><div class="lbl">Abonnés Pro</div><div class="val green">${d.users.pro}</div></div>
+    <div class="stat-card"><div class="lbl">Pro à vie</div><div class="val orange">${d.lifetime}</div></div>
+    <div class="stat-card"><div class="lbl">Bêta approuvés</div><div class="val purple">${d.beta.approved}</div></div>
+    <div class="stat-card"><div class="lbl">En attente bêta</div><div class="val orange">${d.beta.pending}</div></div>
+    <div class="stat-card"><div class="lbl">Nouveaux aujourd'hui</div><div class="val accent">${d.users.new_today}</div></div>
+    <div class="stat-card"><div class="lbl">MRR estimé</div><div class="val green">${d.mrr_estimate}€</div></div>
+    <div class="stat-card"><div class="lbl">Journées enregistrées</div><div class="val">${d.work_days.total}</div></div>
   `;
+  if (d.beta.pending > 0) {
+    document.getElementById('beta-count').textContent = d.beta.pending;
+    document.getElementById('beta-count').style.display = 'inline-block';
+  }
+}
+
+// ── DEMANDES BÊTA ──
+async function loadBeta() {
+  const d = await api('/api/admin/beta/requests');
+  const wrap = document.getElementById('beta-wrap');
+  if (!d.requests || d.requests.length === 0) {
+    wrap.innerHTML = '<div class="empty">✅ Aucune demande en attente.</div>';
+    return;
+  }
+  wrap.innerHTML = d.requests.map(r => `
+    <div class="beta-card" id="beta-${r.id}">
+      <div class="bc-header">
+        <div>
+          <div class="bc-name">${r.full_name || 'Sans nom'}</div>
+          <div class="bc-email">${r.email}</div>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">${new Date(r.created_at).toLocaleDateString('fr-BE')}</div>
+      </div>
+      ${r.beta_message ? `<div class="bc-msg">"${r.beta_message}"</div>` : '<div style="font-size:12px;color:var(--muted);margin-bottom:12px;font-style:italic">Aucun message</div>'}
+      <div class="bc-actions">
+        <button class="btn-approve" onclick="approveBeta(${r.id})">✓ Approuver</button>
+        <button class="btn-reject" onclick="rejectBeta(${r.id})">✕ Refuser</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function approveBeta(id) {
+  await api(`/api/admin/beta/${id}/approve`, 'PATCH');
+  document.getElementById('beta-' + id).remove();
+  const remaining = document.querySelectorAll('[id^="beta-"]').length;
+  if (remaining === 0) document.getElementById('beta-wrap').innerHTML = '<div class="empty">✅ Aucune demande en attente.</div>';
+  updateBadge();
+}
+
+async function rejectBeta(id) {
+  if (!confirm('Refuser cette demande ?')) return;
+  await api(`/api/admin/beta/${id}/reject`, 'PATCH');
+  document.getElementById('beta-' + id).remove();
+  updateBadge();
+}
+
+function updateBadge() {
+  const remaining = document.querySelectorAll('[id^="beta-"]').length;
+  const badge = document.getElementById('beta-count');
+  if (remaining > 0) { badge.textContent = remaining; badge.style.display = 'inline-block'; }
+  else badge.style.display = 'none';
 }
 
 // ── USERS ──
-async function loadUsers(search = '') {
+async function loadUsers(search='') {
   const wrap = document.getElementById('users-table-wrap');
   wrap.innerHTML = '<div class="loading">Chargement...</div>';
-
   const q = search ? `&search=${encodeURIComponent(search)}` : '';
-  const data = await api(`/api/admin/users?page=${currentPage}&per_page=20${q}`);
-
-  if (!data.users || data.users.length === 0) {
-    wrap.innerHTML = '<div class="empty">Aucun utilisateur trouvé.</div>';
-    document.getElementById('pagination').style.display = 'none';
-    return;
-  }
-
-  wrap.innerHTML = `
-    <table>
-      <thead>
-        <tr>
-          <th>Email</th>
-          <th>Nom</th>
-          <th>Plan</th>
-          <th>Statut</th>
-          <th>Inscription</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${data.users.map(u => `
-          <tr>
-            <td>${u.email}</td>
-            <td>${u.full_name || '—'}</td>
-            <td><span class="badge ${u.is_pro ? 'pro' : 'free'}">${u.is_pro ? 'Pro' : 'Gratuit'}</span></td>
-            <td><span class="badge ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? 'Actif' : 'Inactif'}</span></td>
-            <td>${new Date(u.created_at).toLocaleDateString('fr-BE')}</td>
-            <td>
-              <button class="action-btn success" onclick="grantPro(${u.id})">Pro +30j</button>
-              <button class="action-btn ${u.is_active ? 'danger' : ''}" onclick="toggleUser(${u.id})">${u.is_active ? 'Désactiver' : 'Activer'}</button>
-              <button class="action-btn" onclick="unlockUser(${u.id})">Déverrouiller</button>
-            </td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
-  `;
-
-  const totalPages = Math.ceil(data.total / data.per_page);
-  document.getElementById('pagination').style.display = 'flex';
-  document.getElementById('page-info').textContent = `Page ${currentPage} / ${totalPages} (${data.total} utilisateurs)`;
-  document.getElementById('btn-prev').disabled = currentPage <= 1;
-  document.getElementById('btn-next').disabled = currentPage >= totalPages;
+  const d = await api(`/api/admin/users?page=${currentPage}&per_page=20${q}`);
+  if (!d.users || d.users.length === 0) { wrap.innerHTML = '<div class="empty">Aucun utilisateur trouvé.</div>'; document.getElementById('pagination').style.display='none'; return; }
+  wrap.innerHTML = `<table><thead><tr><th>Email</th><th>Nom</th><th>Grade</th><th>Plan</th><th>Statut</th><th>Inscription</th><th>Actions</th></tr></thead><tbody>
+    ${d.users.map(u => `<tr>
+      <td>${u.email}</td>
+      <td>${u.full_name||'—'}</td>
+      <td><span class="badge ${u.grade==='beta'?'beta':u.lifetime_pro?'lifetime':u.grade==='admin'?'pro':'free'}">${u.grade||'user'}</span></td>
+      <td><span class="badge ${u.is_pro?'pro':'free'}">${u.is_pro?'Pro':'Gratuit'}</span></td>
+      <td><span class="badge ${u.is_active?'active':'inactive'}">${u.is_active?'Actif':'Inactif'}</span></td>
+      <td>${new Date(u.created_at).toLocaleDateString('fr-BE')}</td>
+      <td>
+        <button class="action-btn success" onclick="grantPro(${u.id})">Pro 30j</button>
+        <button class="action-btn ${u.is_active?'danger':''}" onclick="toggleUser(${u.id})">${u.is_active?'Désactiver':'Activer'}</button>
+        <button class="action-btn" onclick="unlockUser(${u.id})">🔓</button>
+      </td>
+    </tr>`).join('')}
+  </tbody></table>`;
+  const total = Math.ceil(d.total / d.per_page);
+  document.getElementById('pagination').style.display='flex';
+  document.getElementById('page-info').textContent=`Page ${currentPage}/${total} (${d.total})`;
+  document.getElementById('btn-prev').disabled = currentPage<=1;
+  document.getElementById('btn-next').disabled = currentPage>=total;
 }
 
-function changePage(dir) {
-  currentPage += dir;
-  loadUsers(document.getElementById('search-input').value);
+function changePage(dir) { currentPage+=dir; loadUsers(document.getElementById('search-input').value); }
+function searchUsers() { clearTimeout(searchTimer); searchTimer=setTimeout(()=>{currentPage=1;loadUsers(document.getElementById('search-input').value);},400); }
+
+// ── GRADES ──
+async function loadGrades(search='') {
+  const wrap = document.getElementById('grades-table-wrap');
+  wrap.innerHTML = '<div class="loading">Chargement...</div>';
+  const q = search ? `&search=${encodeURIComponent(search)}` : '';
+  const d = await api(`/api/admin/users?page=${gradeCurrentPage}&per_page=20${q}`);
+  if (!d.users || d.users.length === 0) { wrap.innerHTML = '<div class="empty">Aucun utilisateur trouvé.</div>'; return; }
+  wrap.innerHTML = `<table><thead><tr><th>Email</th><th>Nom</th><th>Grade actuel</th><th>Bêta</th><th>Changer le grade</th></tr></thead><tbody>
+    ${d.users.map(u => `<tr>
+      <td>${u.email}</td>
+      <td>${u.full_name||'—'}</td>
+      <td><span class="badge ${u.grade==='beta'?'beta':u.lifetime_pro?'lifetime':u.grade==='admin'?'pro':'free'}">${u.grade||'user'}</span></td>
+      <td><span class="badge ${u.beta_status==='approved'?'approved':u.beta_status==='pending'?'pending':u.beta_status==='rejected'?'rejected':'free'}">${u.beta_status||'none'}</span></td>
+      <td>
+        <select class="grade-select" onchange="setGrade(${u.id}, this.value)">
+          <option value="">-- Choisir --</option>
+          <option value="user" ${u.grade==='user'?'selected':''}>👤 User</option>
+          <option value="beta" ${u.grade==='beta'?'selected':''}>🧪 Bêta</option>
+          <option value="pro_lifetime" ${u.lifetime_pro?'selected':''}>⭐ Pro à vie</option>
+          <option value="admin" ${u.grade==='admin'?'selected':''}>🛡️ Admin</option>
+        </select>
+      </td>
+    </tr>`).join('')}
+  </tbody></table>`;
 }
 
-function searchUsers() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => {
-    currentPage = 1;
-    loadUsers(document.getElementById('search-input').value);
-  }, 400);
+function searchGrades() { clearTimeout(searchTimer); searchTimer=setTimeout(()=>loadGrades(document.getElementById('grade-search').value),400); }
+
+async function setGrade(userId, grade) {
+  if (!grade) return;
+  if (!confirm(`Attribuer le grade "${grade}" à cet utilisateur ?`)) return;
+  const d = await api(`/api/admin/users/${userId}/grade`, 'PATCH', { grade });
+  alert(d.message || 'Grade mis à jour !');
+  loadGrades(document.getElementById('grade-search').value);
 }
 
 // ── ACTIONS ──
-async function grantPro(userId) {
-  if (!confirm('Accorder 30 jours Pro à cet utilisateur ?')) return;
-  const res = await fetch(`/api/admin/users/${userId}/grant-pro`, {
-    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
-  });
-  const d = await res.json();
-  alert(d.message || 'Fait !');
-  loadUsers(document.getElementById('search-input').value);
+async function grantPro(id) {
+  if (!confirm('Accorder 30 jours Pro ?')) return;
+  const d = await api(`/api/admin/users/${id}/grant-pro`, 'PATCH');
+  alert(d.message); loadUsers(document.getElementById('search-input').value);
 }
-
-async function toggleUser(userId) {
+async function toggleUser(id) {
   if (!confirm('Modifier le statut de ce compte ?')) return;
-  const res = await fetch(`/api/admin/users/${userId}/activate`, {
-    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
-  });
-  const d = await res.json();
-  alert(d.message || 'Fait !');
-  loadUsers(document.getElementById('search-input').value);
+  const d = await api(`/api/admin/users/${id}/activate`, 'PATCH');
+  alert(d.message); loadUsers(document.getElementById('search-input').value);
 }
-
-async function unlockUser(userId) {
-  const res = await fetch(`/api/admin/users/${userId}/unlock`, {
-    method: 'PATCH', headers: { 'Authorization': 'Bearer ' + token }
-  });
-  const d = await res.json();
+async function unlockUser(id) {
+  const d = await api(`/api/admin/users/${id}/unlock`, 'PATCH');
   alert(d.message || 'Déverrouillé !');
 }
 
 // ── LOGS ──
 async function loadLogs() {
-  const data = await api('/api/admin/audit-logs?per_page=50');
+  const d = await api('/api/admin/audit-logs?per_page=50');
   const wrap = document.getElementById('logs-wrap');
-
-  if (!data.logs || data.logs.length === 0) {
-    wrap.innerHTML = '<div class="empty">Aucun log disponible.</div>';
-    return;
-  }
-
-  wrap.innerHTML = data.logs.map(l => `
+  if (!d.logs || d.logs.length === 0) { wrap.innerHTML = '<div class="empty">Aucun log.</div>'; return; }
+  wrap.innerHTML = d.logs.map(l => `
     <div class="log-item">
       <span class="log-action">${l.action}</span>
-      <span>User #${l.user_id || '?'}</span>
-      <span class="log-meta">IP: ${l.ip_address || '—'}</span>
+      <span>User #${l.user_id||'?'}</span>
+      <span class="log-meta">IP: ${l.ip_address||'—'}</span>
       <span class="log-meta">${new Date(l.at).toLocaleString('fr-BE')}</span>
-    </div>
-  `).join('');
+    </div>`).join('');
 }
 
-// ── LOGOUT ──
 async function logout() {
-  const refresh = localStorage.getItem('refresh_token');
-  try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refresh_token: refresh })
-    });
-  } catch(e) {}
-  localStorage.clear();
-  window.location.href = '/login';
+  try { await fetch('/api/auth/logout',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({refresh_token:localStorage.getItem('refresh_token')})}); } catch(e) {}
+  localStorage.clear(); window.location.href='/login';
 }
 
-// Init
 loadDashboard();
 </script>
 </body>

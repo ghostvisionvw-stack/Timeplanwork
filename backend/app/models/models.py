@@ -9,7 +9,6 @@ import enum
 class Base(DeclarativeBase):
     pass
 
-# ── ENUMS ──
 class SubscriptionStatus(str, enum.Enum):
     FREE = "free"
     PRO = "pro"
@@ -20,7 +19,18 @@ class DayType(str, enum.Enum):
     SATURDAY = "saturday"
     ECONOMIC_LEAVE = "economic_leave"
 
-# ── UTILISATEUR ──
+class BetaStatus(str, enum.Enum):
+    NONE = "none"           # Pas de demande
+    PENDING = "pending"     # En attente de validation
+    APPROVED = "approved"   # Bêta accepté
+    REJECTED = "rejected"   # Refusé
+
+class UserGrade(str, enum.Enum):
+    USER = "user"               # Utilisateur normal
+    BETA = "beta"               # Bêta testeur
+    PRO_LIFETIME = "pro_lifetime"  # Pro à vie
+    ADMIN = "admin"             # Administrateur
+
 class User(Base):
     __tablename__ = "users"
 
@@ -38,11 +48,21 @@ class User(Base):
     stripe_sub_id       = Column(String(255), nullable=True)
     sub_expires_at      = Column(DateTime(timezone=True), nullable=True)
 
+    # Bêta
+    beta_status         = Column(SAEnum(BetaStatus), default=BetaStatus.NONE)
+    beta_message        = Column(Text, nullable=True)      # Message de candidature
+    beta_approved_at    = Column(DateTime(timezone=True), nullable=True)
+    beta_approved_by    = Column(Integer, nullable=True)   # ID admin
+
+    # Grade
+    grade               = Column(SAEnum(UserGrade), default=UserGrade.USER)
+    lifetime_pro        = Column(Boolean, default=False)   # Pro à vie
+
     # Paramètres travail
-    hourly_rate         = Column(Float, default=0.0)       # Taux horaire
-    contract_hours      = Column(Float, default=8.0)       # Heures/jour contractuelles
-    country             = Column(String(10), default="BE") # Pays
-    collective_agreement= Column(String(100), nullable=True) # CP / Convention
+    hourly_rate         = Column(Float, default=0.0)
+    contract_hours      = Column(Float, default=8.0)
+    country             = Column(String(10), default="BE")
+    collective_agreement= Column(String(100), nullable=True)
 
     # Sécurité
     failed_login_count  = Column(Integer, default=0)
@@ -61,11 +81,17 @@ class User(Base):
 
     @property
     def is_pro(self) -> bool:
+        if self.lifetime_pro:
+            return True
         if self.subscription_status != SubscriptionStatus.PRO:
             return False
         if self.sub_expires_at and self.sub_expires_at < datetime.now(timezone.utc):
             return False
         return True
+
+    @property
+    def has_beta_access(self) -> bool:
+        return self.is_admin or self.beta_status == BetaStatus.APPROVED or self.is_pro
 
     @property
     def is_locked(self) -> bool:
@@ -74,20 +100,19 @@ class User(Base):
         return False
 
 
-# ── JOURNÉE DE TRAVAIL ──
 class WorkDay(Base):
     __tablename__ = "work_days"
 
     id           = Column(Integer, primary_key=True, index=True)
     user_id      = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    date         = Column(String(10), nullable=False)       # YYYY-MM-DD
+    date         = Column(String(10), nullable=False)
     day_type     = Column(SAEnum(DayType), default=DayType.WORK)
-    start_time   = Column(String(5), nullable=True)         # HH:MM
-    end_time     = Column(String(5), nullable=True)         # HH:MM
+    start_time   = Column(String(5), nullable=True)
+    end_time     = Column(String(5), nullable=True)
     break_taken  = Column(Boolean, default=False)
-    real_minutes = Column(Integer, default=0)               # Minutes réelles
-    paid_minutes = Column(Integer, default=0)               # Minutes payées (fiche)
-    gap_minutes  = Column(Integer, default=0)               # Écart
+    real_minutes = Column(Integer, default=0)
+    paid_minutes = Column(Integer, default=0)
+    gap_minutes  = Column(Integer, default=0)
     note         = Column(Text, nullable=True)
     created_at   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
@@ -95,13 +120,12 @@ class WorkDay(Base):
     user = relationship("User", back_populates="work_days")
 
 
-# ── REFRESH TOKENS ──
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
 
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    token_hash = Column(String(255), unique=True, nullable=False)  # On stocke le HASH, jamais le token brut
+    token_hash = Column(String(255), unique=True, nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=False)
     is_revoked = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -111,16 +135,15 @@ class RefreshToken(Base):
     user = relationship("User", back_populates="refresh_tokens")
 
 
-# ── AUDIT LOG ──
 class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id         = Column(Integer, primary_key=True)
     user_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
-    action     = Column(String(100), nullable=False)   # login, logout, export_pdf, sub_upgrade...
+    action     = Column(String(100), nullable=False)
     ip_address = Column(String(50), nullable=True)
     user_agent = Column(String(500), nullable=True)
-    details    = Column(Text, nullable=True)           # JSON
+    details    = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="audit_logs")

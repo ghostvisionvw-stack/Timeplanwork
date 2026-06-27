@@ -9,15 +9,11 @@ from app.core.config import settings
 from app.core.middleware import SecurityMiddleware
 from app.core.database import engine, Base
 from app.api import auth, admin, stripe_webhook
+from app.api import beta
 
-# ── LOGGING ──
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── STARTUP / SHUTDOWN ──
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("TimePlan.work backend démarrage...")
@@ -26,38 +22,30 @@ async def lifespan(app: FastAPI):
     yield
     logger.info("TimePlan.work backend arrêt.")
 
-# ── APPLICATION ──
 app = FastAPI(
-    title="TimePlan.work API",
-    version="1.0.0",
+    title="TimePlan.work API", version="1.0.0",
     docs_url=None if settings.ENVIRONMENT == "production" else "/docs",
     redoc_url=None if settings.ENVIRONMENT == "production" else "/redoc",
     openapi_url=None if settings.ENVIRONMENT == "production" else "/openapi.json",
     lifespan=lifespan,
 )
 
-# ── MIDDLEWARES ──
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
+app.add_middleware(CORSMiddleware,
+    allow_origins=settings.ALLOWED_ORIGINS, allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
-    max_age=3600,
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With"], max_age=3600,
 )
 app.add_middleware(SecurityMiddleware)
 
-# ── ROUTES API ──
 app.include_router(auth.router)
 app.include_router(admin.router)
+app.include_router(beta.router)
 app.include_router(stripe_webhook.router)
 
-# ── HEALTH CHECK ──
 @app.get("/health")
 async def health():
     return {"status": "ok", "app": settings.APP_NAME, "version": settings.APP_VERSION}
 
-# ── PAGES FRONTEND ──
 FRONTEND_DIR = Path(__file__).parent / "frontend"
 
 @app.get("/")
@@ -84,6 +72,5 @@ async def dashboard_page():
 async def admin_page():
     return FileResponse(FRONTEND_DIR / "admin.html")
 
-# ── FICHIERS STATIQUES ──
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
