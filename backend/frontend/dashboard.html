@@ -150,10 +150,16 @@ textarea:focus{border-color:var(--accent);}
           <ul class="plan-features">
             <li>Saisie heures illimitée</li><li>Calcul écart automatique</li>
             <li>Export texte récapitulatif</li>
-            <li class="locked">Export PDF juridique</li><li class="locked">Comparaison fiche de paie</li>
+            <li class="locked">Export PDF juridique (bêta/admin)</li><li class="locked">Comparaison fiche de paie</li>
           </ul>
         </div>
-        <button class="btn-pro" onclick="subscribePro()">⭐ Passer au Pro</button>
+        <div style="text-align:center">
+          <div style="background:rgba(61,127,255,.08);border:1px solid rgba(61,127,255,.25);border-radius:12px;padding:16px 20px;max-width:220px;">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px">Plan Pro</div>
+            <div style="font-size:15px;font-weight:800;color:var(--accent);margin-bottom:8px">Prix bientôt annoncé</div>
+            <button class="btn-pro" disabled style="opacity:.5;cursor:not-allowed;width:100%;font-size:13px;">Bientôt disponible</button>
+          </div>
+        </div>
       </div>
       <div class="plan-card pro-active" id="plan-pro-card" style="display:none">
         <div class="plan-info">
@@ -166,7 +172,10 @@ textarea:focus{border-color:var(--accent);}
         <button class="btn-manage" onclick="manageSubscription()">Gérer l'abonnement</button>
       </div>
       <div class="plan-card" id="plan-beta-card" style="display:none;border-color:var(--purple)">
-        <div class="plan-info"><h3>Accès Bêta 🧪</h3><p>Vous êtes bêta testeur — accès complet au calculateur.</p></div>
+        <div class="plan-info">
+          <h3>Accès Bêta 🧪</h3>
+          <p>Vous êtes bêta testeur — accès complet au calculateur et à l'export PDF.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -282,6 +291,8 @@ async function loadStatus() {
     const res = await fetch('/api/beta/status', { headers: { 'Authorization': 'Bearer ' + token } });
     if (!res.ok) return;
     const data = await res.json();
+    const hasPdfAccess = user.is_pro || user.is_admin || data.is_pro || data.beta_status === 'approved';
+
     if (user.is_pro || data.is_pro) {
       document.getElementById('plan-badge').innerHTML = '<span class="badge-pro">Pro</span>';
       document.getElementById('stat-plan').textContent = 'Pro';
@@ -289,23 +300,35 @@ async function loadStatus() {
       document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--green)">✅ Inclus</span>';
       document.getElementById('plan-free-card').style.display = 'none';
       document.getElementById('plan-pro-card').style.display = 'flex';
-    } else if (data.beta_status === 'approved') {
+    } else if (data.beta_status === 'approved' || user.is_admin) {
       document.getElementById('plan-badge').innerHTML = '<span class="badge-beta">Bêta</span>';
-      document.getElementById('stat-plan').textContent = 'Bêta';
+      document.getElementById('stat-plan').textContent = user.is_admin ? 'Admin' : 'Bêta';
       document.getElementById('stat-calc').textContent = '✅ Actif';
-      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--green)">✅ Inclus</span>';
       document.getElementById('plan-free-card').style.display = 'none';
       document.getElementById('plan-beta-card').style.display = 'flex';
     } else if (data.beta_status === 'pending') {
       document.getElementById('plan-badge').innerHTML = '<span class="badge-free">En attente</span>';
       document.getElementById('stat-plan').textContent = 'Gratuit';
       document.getElementById('stat-calc').textContent = '⏳ En attente';
-      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Bêta / Pro</span>';
     } else {
       document.getElementById('plan-badge').innerHTML = '<span class="badge-free">Gratuit</span>';
       document.getElementById('stat-plan').textContent = 'Gratuit';
       document.getElementById('stat-calc').innerHTML = '<span style="color:var(--orange)">🔒 Bêta requis</span>';
-      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Pro uniquement</span>';
+      document.getElementById('stat-pdf').innerHTML = '<span style="color:var(--muted)">Bêta / Pro</span>';
+    }
+
+    // Carte PDF dans les actions
+    const pdfCard = document.getElementById('pdf-card');
+    const pdfDesc = document.getElementById('pdf-desc');
+    if (hasPdfAccess) {
+      pdfCard.onclick = function() { window.location.href = '/calculateur'; };
+      pdfDesc.textContent = 'Générez un rapport complet pour votre avocat ou le Conseil de Prud\'hommes.';
+    } else {
+      pdfCard.style.opacity = '0.5';
+      pdfCard.style.cursor = 'not-allowed';
+      pdfDesc.textContent = 'Réservé aux bêta testeurs et abonnés Pro. Prix à venir.';
     }
   } catch(e) {}
 }

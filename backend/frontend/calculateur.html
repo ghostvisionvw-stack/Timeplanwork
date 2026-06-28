@@ -210,7 +210,7 @@ select option{background:#1a1d27;}
       <h2>📋 Historique</h2>
       <div class="export-btns">
         <button class="btn-export" onclick="toggleExport()">📋 Export texte</button>
-        <button class="btn-export" onclick="exportPDF()" style="border-color:var(--accent);color:var(--accent)">📄 PDF ⭐</button>
+        <button class="btn-export" onclick="exportPDF()" style="border-color:var(--accent);color:var(--accent)">📄 PDF Bêta/Pro</button>
       </div>
     </div>
     <div class="filter-bar" id="filter-bar">
@@ -469,11 +469,23 @@ async function loadFromDB() {
 
 async function exportPDF() {
   if (!TOKEN) { alert('Connectez-vous pour exporter en PDF.'); return; }
+  // Verifier acces beta ou admin
+  const _user = JSON.parse(localStorage.getItem('user') || 'null');
+  if (_user && !_user.is_admin && !_user.is_pro) {
+    try {
+      const _sr = await fetch('/api/beta/status', { headers: {'Authorization':'Bearer '+TOKEN} });
+      const _sd = await _sr.json();
+      if (!_sd.has_access && !_sd.is_pro) {
+        alert("L'export PDF est reserve aux beta testeurs et aux abonnes Pro.\nDemandez votre acces beta depuis votre dashboard.");
+        return;
+      }
+    } catch(e) {}
+  }
   // Sync d'abord pour s'assurer que toutes les données sont en DB
   await syncDB();
   try {
     const res = await fetch('/api/workdays/export/pdf', { headers:{'Authorization':'Bearer '+TOKEN} });
-    if (res.status === 402) { alert('⭐ L\'export PDF est réservé aux abonnés Pro.\nPassez au Pro depuis votre dashboard.'); return; }
+    if (res.status === 402) { alert("L'export PDF est reserve aux beta testeurs et abonnes Pro."); return; }
     if (res.status === 404) { alert('Aucune journée enregistrée à exporter.'); return; }
     if (!res.ok) { const d=await res.json(); alert(d.detail||'Erreur PDF.'); return; }
     const blob = await res.blob();
