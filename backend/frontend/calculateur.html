@@ -79,6 +79,30 @@ select option{background:#1a1d27;}
 .sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);}
 .sync-dot.syncing{background:var(--orange);animation:pulse 1s infinite;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+/* ── PAUSE SYSTEM ── */
+.pause-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:10px;}
+.pause-toggle{display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.pause-toggle-label{font-size:13px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;}
+.pause-badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:rgba(243,156,18,0.15);color:var(--orange);}
+.pause-badge.prise{background:rgba(231,76,60,0.15);color:var(--red);}
+.pause-badge.non-prise{background:rgba(46,204,113,0.15);color:var(--green);}
+.toggle-switch{position:relative;width:38px;height:22px;flex-shrink:0;}
+.toggle-switch input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:22px;transition:.2s;}
+.toggle-slider:before{content:'';position:absolute;width:16px;height:16px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+.toggle-switch input:checked+.toggle-slider{background:var(--accent);}
+.toggle-switch input:checked+.toggle-slider:before{transform:translateX(16px);}
+.pause-details{margin-top:12px;display:none;}
+.pause-details.open{display:block;}
+.pause-info-box{background:rgba(243,156,18,0.07);border:1px solid rgba(243,156,18,0.25);border-radius:8px;padding:10px 12px;font-size:11px;color:var(--muted);line-height:1.6;margin-top:10px;}
+.pause-info-box strong{color:var(--orange);}
+.pause-status-row{display:flex;align-items:center;gap:10px;margin-top:10px;}
+.pause-status-btn{flex:1;padding:9px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s;text-align:center;}
+.pause-status-btn.active-prise{background:rgba(231,76,60,0.15);border-color:var(--red);color:var(--red);}
+.pause-status-btn.active-non-prise{background:rgba(46,204,113,0.15);border-color:var(--green);color:var(--green);}
+.convention-pause-info{font-size:11px;color:var(--muted);margin-top:6px;line-height:1.5;}
+
 </style>
 </head>
 <body>
@@ -167,7 +191,52 @@ select option{background:#1a1d27;}
           <input type="time" id="inp-fin" value="">
         </div>
       </div>
-      <div class="field-row single">
+
+      <!-- SYSTÈME DE PAUSE -->
+      <div class="pause-card">
+        <div class="pause-toggle" onclick="togglePauseSection()">
+          <div class="pause-toggle-label">
+            ☕ Pause incluse ?
+            <span class="pause-badge" id="pause-badge">Non configurée</span>
+          </div>
+          <label class="toggle-switch" onclick="event.stopPropagation()">
+            <input type="checkbox" id="pause-active" onchange="onPauseToggle()">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="pause-details" id="pause-details">
+          <div class="field-row" style="margin-top:12px;">
+            <div>
+              <label>Durée de pause (minutes)</label>
+              <input type="number" id="inp-pause-min" min="0" max="120" step="5" value="30" placeholder="30" oninput="onPauseChange()">
+            </div>
+            <div>
+              <label>Mode de saisie</label>
+              <select id="inp-pause-mode" onchange="onPauseModeChange()">
+                <option value="manuel">Manuel (je saisis)</option>
+                <option value="convention">Convention collective</option>
+              </select>
+            </div>
+          </div>
+          <div id="convention-pause-info" class="convention-pause-info" style="display:none;"></div>
+          <div style="margin-top:10px;">
+            <label style="margin-bottom:6px;display:block;">Pause prise ou non prise ?</label>
+            <div class="pause-status-row">
+              <button class="pause-status-btn" id="btn-pause-prise" onclick="setPauseStatus('prise')">
+                ❌ Pause déduite<br><span style="font-size:10px;font-weight:400">Non payée — déduite du temps réel</span>
+              </button>
+              <button class="pause-status-btn" id="btn-pause-non-prise" onclick="setPauseStatus('non-prise')">
+                ✅ Pause non prise<br><span style="font-size:10px;font-weight:400">Travaillée — compte dans les heures réelles</span>
+              </button>
+            </div>
+          </div>
+          <div class="pause-info-box" id="pause-info-box">
+            ℹ️ Sélectionnez si la pause a été <strong>réellement prise</strong> ou si vous avez <strong>travaillé pendant</strong> la pause prévue.
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row single" style="margin-top:10px;">
         <div>
           <label>Heures payées sur fiche (ex: 8.00)</label>
           <input type="number" id="inp-paye" min="0" max="24" step="0.25" placeholder="8.00" value="8">
@@ -511,6 +580,110 @@ function getMoisLabel(dateStr) {
 function getMoisKey(dateStr) { return dateStr.substring(0,7); }
 function sauvegarder() { localStorage.setItem('heures_dacol',JSON.stringify(jours)); }
 
+// ── PAUSE SYSTEM ──
+const CONVENTION_PAUSES = {
+  'CP140.03': { min: 30, label: 'CP 140.03 — Transport : pause de 30 min obligatoire après 6h de travail' },
+  'CP200':    { min: 15, label: 'CP 200 — Employés : pause de 15 min après 4h de travail' },
+  'CP100':    { min: 30, label: 'CP 100 — Pause de 30 min standard' },
+  'CP111':    { min: 30, label: 'CP 111 — Métallurgie : pause déjeuner 30 min' },
+  'CP118':    { min: 30, label: 'CP 118 — Alimentation : pause 30 min' },
+  'CP124':    { min: 30, label: 'CP 124 — Construction : pause 30 min (ou 15 min + repos)' },
+  'CP130':    { min: 30, label: 'CP 130 — Presse : pause 30 min' },
+  'CP144':    { min: 30, label: 'CP 144 — Agriculture : pause 30 min' },
+  'CP302':    { min: 30, label: 'CP 302 — Horeca : pause 30 min (variable selon service)' },
+  'CP319':    { min: 15, label: 'CP 319 — Aide familiale : pause 15 min' },
+  'SYNTEC':   { min: 60, label: 'SYNTEC — Pause déjeuner 1h conventionnelle' },
+  'BTP_FR':   { min: 30, label: 'BTP France — Pause 30 min après 6h' },
+  'TRANSPORT_FR': { min: 45, label: 'Transport FR — Pause 45 min (règlement CE 561/2006)' },
+  'HOTELLERIE_FR':{ min: 30, label: 'Hôtellerie-restauration : pause 30 min' },
+  'CCT_LU_GEN':   { min: 30, label: 'Luxembourg — Pause 30 min standard' },
+};
+
+let pauseStatus = null; // 'prise' | 'non-prise' | null
+
+function togglePauseSection() {
+  const cb = document.getElementById('pause-active');
+  cb.checked = !cb.checked;
+  onPauseToggle();
+}
+
+function onPauseToggle() {
+  const active = document.getElementById('pause-active').checked;
+  const details = document.getElementById('pause-details');
+  details.classList.toggle('open', active);
+  if (!active) {
+    pauseStatus = null;
+    document.getElementById('pause-badge').textContent = 'Non configurée';
+    document.getElementById('pause-badge').className = 'pause-badge';
+  } else {
+    onPauseModeChange();
+    updatePauseBadge();
+  }
+}
+
+function onPauseModeChange() {
+  const mode = document.getElementById('inp-pause-mode').value;
+  const conv = document.getElementById('inp-convention')?.value || '';
+  const infoEl = document.getElementById('convention-pause-info');
+  const pauseInput = document.getElementById('inp-pause-min');
+  if (mode === 'convention') {
+    const data = CONVENTION_PAUSES[conv];
+    if (data) {
+      pauseInput.value = data.min;
+      infoEl.innerHTML = '📋 <strong>' + data.label + '</strong>';
+      infoEl.style.display = 'block';
+    } else {
+      infoEl.innerHTML = '⚠️ Convention non reconnue — saisissez la durée manuellement.';
+      infoEl.style.display = 'block';
+      document.getElementById('inp-pause-mode').value = 'manuel';
+    }
+  } else {
+    infoEl.style.display = 'none';
+  }
+  updatePauseBadge();
+}
+
+function onPauseChange() { updatePauseBadge(); }
+
+function setPauseStatus(status) {
+  pauseStatus = status;
+  document.getElementById('btn-pause-prise').className = 'pause-status-btn' + (status === 'prise' ? ' active-prise' : '');
+  document.getElementById('btn-pause-non-prise').className = 'pause-status-btn' + (status === 'non-prise' ? ' active-non-prise' : '');
+  const box = document.getElementById('pause-info-box');
+  if (status === 'prise') {
+    box.innerHTML = '❌ <strong>Pause déduite</strong> — La pause sera soustraite de votre temps réel. Vous avez arrêté de travailler pendant ce temps.';
+    box.style.background = 'rgba(231,76,60,0.07)';
+    box.style.borderColor = 'rgba(231,76,60,0.25)';
+  } else {
+    box.innerHTML = '✅ <strong>Pause non prise</strong> — Vous avez travaillé pendant la pause. Ce temps sera <strong>ajouté à vos heures réelles</strong> comme temps supplémentaire.';
+    box.style.background = 'rgba(46,204,113,0.07)';
+    box.style.borderColor = 'rgba(46,204,113,0.25)';
+  }
+  updatePauseBadge();
+}
+
+function updatePauseBadge() {
+  const active = document.getElementById('pause-active').checked;
+  const badge = document.getElementById('pause-badge');
+  if (!active) { badge.textContent = 'Non configurée'; badge.className = 'pause-badge'; return; }
+  const min = parseInt(document.getElementById('inp-pause-min').value) || 0;
+  if (!pauseStatus) { badge.textContent = min + ' min — statut ?'; badge.className = 'pause-badge'; return; }
+  if (pauseStatus === 'prise') {
+    badge.textContent = min + ' min — déduite ❌';
+    badge.className = 'pause-badge prise';
+  } else {
+    badge.textContent = min + ' min — travaillée ✅';
+    badge.className = 'pause-badge non-prise';
+  }
+}
+
+function getPauseMinutes() {
+  const active = document.getElementById('pause-active').checked;
+  if (!active || !pauseStatus) return { pauseMin: 0, status: null };
+  const min = parseInt(document.getElementById('inp-pause-min').value) || 0;
+  return { pauseMin: min, status: pauseStatus };
+}
+
 // ── AJOUTER ──
 function ajouterJour() {
   const date=document.getElementById('inp-date').value;
@@ -530,9 +703,19 @@ function ajouterJour() {
   }
   let entree={date,type,note};
   if(type!=='chomage'){
-    const reelles=parseTime(fin)-parseTime(debut);
+    const { pauseMin, status: pauseSt } = getPauseMinutes();
+    let reelles = parseTime(fin) - parseTime(debut);
+    // Si pause prise → on soustrait du temps réel (temps vraiment travaillé)
+    // Si pause non prise → on garde tout (travaillé pendant la pause)
+    if (pauseMin > 0 && pauseSt === 'prise') {
+      reelles = reelles - pauseMin;
+    }
+    // pause non prise : reelles reste intact (la pause était du vrai travail)
     const payeesMin=Math.round(paye*60);
-    entree={...entree,debut,fin,reellesMin:reelles,payeesMin,ecartMin:reelles-payeesMin};
+    entree={...entree,debut,fin,
+      pauseMin: pauseMin||0,
+      pauseStatus: pauseSt||null,
+      reellesMin:reelles,payeesMin,ecartMin:reelles-payeesMin};
   }
   jours.push(entree);
   jours.sort((a,b)=>a.date.localeCompare(b.date));
@@ -544,6 +727,14 @@ function ajouterJour() {
   document.getElementById('inp-type').value='travail';
   document.getElementById('zone-heures').style.display='block';
   document.getElementById('zone-chomage').style.display='none';
+  // Reset pause
+  document.getElementById('pause-active').checked = false;
+  document.getElementById('pause-details').classList.remove('open');
+  document.getElementById('pause-badge').textContent = 'Non configurée';
+  document.getElementById('pause-badge').className = 'pause-badge';
+  pauseStatus = null;
+  document.getElementById('btn-pause-prise').className = 'pause-status-btn';
+  document.getElementById('btn-pause-non-prise').className = 'pause-status-btn';
   const d=new Date(date+'T00:00:00'); d.setDate(d.getDate()+1);
   if(d.getDay()===0)d.setDate(d.getDate()+1);
   document.getElementById('inp-date').value=d.toISOString().split('T')[0];
@@ -632,8 +823,11 @@ function rendreListe() {
     if(j.type==='chomage'){pillClass='chomage';pillText='💤 Absence';details='Journée non travaillée';}
     else if(j.type==='samedi'){pillClass='samedi';pillText='📅 Sam. '+minToStr(j.ecartMin);details=j.debut+' → '+j.fin+' | Réel: '+minToStrAbs(j.reellesMin)+' | Payé: '+minToStrAbs(j.payeesMin);}
     else{pillClass=j.ecartMin>0?'pos':j.ecartMin<0?'neg':'zero';pillText=minToStr(j.ecartMin);details=j.debut+' → '+j.fin+' | Réel: '+minToStrAbs(j.reellesMin)+' | Payé: '+minToStrAbs(j.payeesMin);}
+    const pauseHtml = j.pauseMin > 0
+      ? '<br><span style="color:'+(j.pauseStatus==='prise'?'var(--red)':'var(--green)')+';font-size:10px">☕ Pause '+j.pauseMin+'min — '+(j.pauseStatus==='prise'?'déduite ❌':'travaillée ✅')+'</span>'
+      : '';
     const noteHtml=j.note?'<br><span style="color:var(--accent);font-size:10px">💬 '+j.note+'</span>':'';
-    return `<div class="day-item"><div><div class="date-label">${formatDate(j.date)}</div><div class="day-detail">${details}${noteHtml}</div></div><div class="day-actions"><span class="ecart-pill ${pillClass}">${pillText}</span><button class="delete-btn" onclick="supprimerJour('${j.date}')">🗑</button></div></div>`;
+    return `<div class="day-item"><div><div class="date-label">${formatDate(j.date)}</div><div class="day-detail">${details}${pauseHtml}${noteHtml}</div></div><div class="day-actions"><span class="ecart-pill ${pillClass}">${pillText}</span><button class="delete-btn" onclick="supprimerJour('${j.date}')">🗑</button></div></div>`;
   }).join('');
 }
 
@@ -676,6 +870,7 @@ function toggleExport() {
     else{
       txt+=formatDate(j.date)+(j.type==='samedi'?' [SAMEDI]':'')+'\n';
       txt+='  Début: '+j.debut+'  Fin: '+j.fin+'\n';
+      if(j.pauseMin>0) txt+='  Pause: '+j.pauseMin+'min — '+(j.pauseStatus==='prise'?'déduite (non travaillée)':'travaillée (non prise)')+'\n';
       txt+='  Réel: '+minToStrAbs(j.reellesMin)+'  |  Payé: '+minToStrAbs(j.payeesMin)+'  |  Écart: '+minToStr(j.ecartMin)+'\n';
     }
     if(j.note)txt+='  Note: '+j.note+'\n';
