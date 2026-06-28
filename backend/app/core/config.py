@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USER: str = ""
     SMTP_PASSWORD: str = ""
-    EMAIL_FROM: str = "noreply@timeplan.work"
+    EMAIL_FROM: str = "contact@timeplanwork.com"
 
     # ── ADMIN ──
     ADMIN_EMAIL: str  # OBLIGATOIRE — votre email admin

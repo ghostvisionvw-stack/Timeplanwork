@@ -1,12 +1,13 @@
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
 from pydantic import BaseModel
 from app.models.models import User, WorkDay, AuditLog, SubscriptionStatus, BetaStatus, UserGrade, RefreshToken
 from app.api.auth import get_current_admin
 from app.core.database import get_db
+from app.core.email import send_beta_approved_email, send_feedback_reply_email
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -54,13 +55,6 @@ async def list_users(
 
     result = []
     for u in users:
-        # Dernière IP de connexion depuis les RefreshTokens
-        last_token = db.query(RefreshToken).filter(
-            RefreshToken.user_id == u.id,
-            RefreshToken.is_revoked == False
-        ).order_by(desc(RefreshToken.created_at)).first()
-
-        # Dernière IP depuis les AuditLogs
         last_login_log = db.query(AuditLog).filter(
             AuditLog.user_id == u.id,
             AuditLog.action == "login_success"
@@ -118,15 +112,23 @@ async def beta_requests(db: Session = Depends(get_db), admin: User = Depends(get
     } for u in users]}
 
 @router.patch("/beta/{user_id}/approve")
-async def approve_beta(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
+async def approve_beta(
+    user_id: int,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
+):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
     user.beta_status = BetaStatus.APPROVED
     user.grade = UserGrade.BETA
+    user.is_active = True
     user.beta_approved_at = datetime.now(timezone.utc)
     user.beta_approved_by = admin.id
     db.commit()
+    first_name = user.full_name.split()[0] if user.full_name else "là"
+    background_tasks.add_task(send_beta_approved_email, user.email, first_name)
     return {"message": f"Accès bêta accordé à {user.email}"}
 
 @router.patch("/beta/{user_id}/reject")
@@ -173,7 +175,6 @@ async def toggle_user(user_id: int, db: Session = Depends(get_db), admin: User =
     if user.id == admin.id:
         raise HTTPException(status_code=400, detail="Impossible de modifier votre propre compte.")
     user.is_active = not user.is_active
-    # Si désactivé → révoquer tous les tokens
     if not user.is_active:
         db.query(RefreshToken).filter(RefreshToken.user_id == user_id).update({"is_revoked": True})
     db.commit()
@@ -191,7 +192,6 @@ async def unlock_user(user_id: int, db: Session = Depends(get_db), admin: User =
 
 @router.patch("/users/{user_id}/grant-pro")
 async def grant_pro(user_id: int, db: Session = Depends(get_db), admin: User = Depends(get_current_admin)):
-    from datetime import timedelta
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
@@ -242,7 +242,7 @@ async def stats(db: Session = Depends(get_db), admin: User = Depends(get_current
         "total_logs": db.query(func.count(AuditLog.id)).scalar(),
     }
 
-# ── SUPER-ADMIN : RÉVÉLER IP ──
+# ── SUPER-ADMIN ──
 def get_current_superadmin(current_user: User = Depends(get_current_admin)) -> User:
     if not current_user.is_superadmin:
         raise HTTPException(status_code=403, detail="Accès réservé au super-administrateur.")
@@ -254,32 +254,26 @@ async def reveal_ip(
     db: Session = Depends(get_db),
     superadmin: User = Depends(get_current_superadmin)
 ):
-    """Révèle les IPs réelles d'un utilisateur — super-admin uniquement. Logué."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
-
-    # Log chaque révélation d'IP
     db.add(AuditLog(
         user_id=superadmin.id,
         action="ip_revealed",
         details=f"IPs de user_id:{user_id} ({user.email}) révélées par superadmin"
     ))
     db.commit()
-
-    # Récupérer toutes les IPs de connexion
     login_ips = db.query(AuditLog.ip_address, AuditLog.created_at).filter(
         AuditLog.user_id == user_id,
         AuditLog.action == "login_success"
     ).order_by(desc(AuditLog.created_at)).limit(20).all()
-
     return {
         "user_id": user_id,
         "email": user.email,
         "ips": [{"ip": ip, "at": at.isoformat()} for ip, at in login_ips if ip]
     }
 
-# ── FEEDBACKS (admin) ──
+# ── FEEDBACKS ──
 @router.get("/feedbacks")
 async def list_feedbacks(
     page: int = Query(1, ge=1),
@@ -311,19 +305,31 @@ class AdminReply(BaseModel):
 
 @router.patch("/feedbacks/{feedback_id}/reply")
 async def admin_reply_feedback(
-    feedback_id: int, body: AdminReply,
-    db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
+    feedback_id: int,
+    body: AdminReply,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_current_admin)
 ):
     from app.api.feedback import Feedback
-    from datetime import datetime, timezone
     fb = db.query(Feedback).filter(Feedback.id == feedback_id).first()
     if not fb:
         raise HTTPException(status_code=404, detail="Feedback introuvable.")
     fb.admin_reply = body.reply.strip()
     fb.admin_id = admin.id
-    fb.status = body.status if body.status in ["replied","closed"] else "replied"
+    fb.status = body.status if body.status in ["replied", "closed"] else "replied"
     fb.replied_at = datetime.now(timezone.utc)
     db.commit()
+
+    # Envoyer email de réponse à l'utilisateur
+    user = db.query(User).filter(User.id == fb.user_id).first()
+    if user:
+        first_name = user.full_name.split()[0] if user.full_name else "là"
+        background_tasks.add_task(
+            send_feedback_reply_email,
+            user.email, first_name, fb.message, body.reply.strip()
+        )
+
     return {"message": "Réponse envoyée."}
 
 @router.patch("/feedbacks/{feedback_id}/status")
@@ -332,10 +338,11 @@ async def set_feedback_status_admin(
     db: Session = Depends(get_db), admin: User = Depends(get_current_admin)
 ):
     from app.api.feedback import Feedback
-    if status not in ["open","replied","closed"]:
+    if status not in ["open", "replied", "closed"]:
         raise HTTPException(status_code=400, detail="Statut invalide.")
     fb = db.query(Feedback).filter(Feedback.id == feedback_id).first()
     if not fb:
         raise HTTPException(status_code=404, detail="Feedback introuvable.")
-    fb.status = status; db.commit()
+    fb.status = status
+    db.commit()
     return {"message": f"Statut: {status}"}

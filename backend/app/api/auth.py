@@ -14,6 +14,7 @@ from app.core.security import (
 from app.core.config import settings
 from app.models.models import User, RefreshToken, AuditLog
 from app.core.database import get_db
+from app.core.email import send_reset_password_email
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
@@ -196,6 +197,7 @@ async def request_reset(body: ResetRequest, background_tasks: BackgroundTasks, d
     user = db.query(User).filter(User.email == body.email.lower()).first()
     if user and user.is_active:
         token = create_reset_token(user.email)
+        background_tasks.add_task(send_reset_password_email, user.email, token)
         logger.info(f"[RESET_PASSWORD_REQUEST] {user.email}")
     return {"message": "Si cet email existe, un lien de réinitialisation vous a été envoyé."}
 
@@ -252,7 +254,6 @@ async def update_profile(
     if changes:
         log_audit(db, current_user.id, "profile_updated", request, f"fields:{','.join(changes)}")
         db.commit()
-        # Mettre à jour le localStorage côté client via la réponse
         logger.info(f"[PROFILE_UPDATE] {current_user.email} | fields:{changes}")
     return {
         "message": "Profil mis à jour avec succès.",
