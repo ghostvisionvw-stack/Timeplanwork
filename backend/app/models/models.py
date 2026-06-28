@@ -5,6 +5,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship, DeclarativeBase
 import enum
+import json
 
 class Base(DeclarativeBase):
     pass
@@ -38,6 +39,7 @@ class User(Base):
     email               = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password     = Column(String(255), nullable=False)
     full_name           = Column(String(255), nullable=True)
+    address             = Column(String(500), nullable=True)
     is_active           = Column(Boolean, default=True, nullable=False)
     is_admin            = Column(Boolean, default=False, nullable=False)
     is_superadmin       = Column(Boolean, default=False, nullable=False)
@@ -49,15 +51,18 @@ class User(Base):
     stripe_sub_id       = Column(String(255), nullable=True)
     sub_expires_at      = Column(DateTime(timezone=True), nullable=True)
 
-    # Bêta
+    # Beta
     beta_status         = Column(SAEnum(BetaStatus), default=BetaStatus.NONE)
     beta_message        = Column(Text, nullable=True)
     beta_approved_at    = Column(DateTime(timezone=True), nullable=True)
     beta_approved_by    = Column(Integer, nullable=True)
 
-    # Grade
+    # Grade principal (compatibilité)
     grade               = Column(SAEnum(UserGrade), default=UserGrade.USER)
     lifetime_pro        = Column(Boolean, default=False)
+
+    # Multi-grades (JSON list: ["beta", "pro_lifetime", ...])
+    grades_json         = Column(Text, nullable=True, default="[]")
 
     # Paramètres travail
     hourly_rate         = Column(Float, default=0.0)
@@ -81,8 +86,46 @@ class User(Base):
     audit_logs     = relationship("AuditLog", back_populates="user", cascade="all, delete-orphan")
 
     @property
+    def grades_list(self) -> list:
+        try:
+            return json.loads(self.grades_json or "[]")
+        except:
+            return []
+
+    def set_grades(self, grades: list):
+        self.grades_json = json.dumps(list(set(grades)))
+        # Sync grade principal
+        if "admin" in grades:
+            self.grade = UserGrade.ADMIN
+            self.is_admin = True
+        elif "pro_lifetime" in grades:
+            self.grade = UserGrade.PRO_LIFETIME
+            self.lifetime_pro = True
+        elif "beta" in grades:
+            self.grade = UserGrade.BETA
+        else:
+            self.grade = UserGrade.USER
+        # Sync flags
+        if "pro_lifetime" in grades:
+            self.lifetime_pro = True
+        if "beta" in grades:
+            self.beta_status = BetaStatus.APPROVED
+
+    def add_grade(self, grade: str):
+        g = self.grades_list
+        if grade not in g:
+            g.append(grade)
+        self.set_grades(g)
+
+    def remove_grade(self, grade: str):
+        g = self.grades_list
+        if grade in g:
+            g.remove(grade)
+        self.set_grades(g)
+
+    @property
     def is_pro(self) -> bool:
-        if self.lifetime_pro:
+        if self.lifetime_pro or "pro_lifetime" in self.grades_list:
             return True
         if self.subscription_status != SubscriptionStatus.PRO:
             return False
@@ -92,13 +135,32 @@ class User(Base):
 
     @property
     def has_beta_access(self) -> bool:
-        return self.is_admin or self.beta_status == BetaStatus.APPROVED or self.is_pro
+        return (self.is_admin or
+                self.beta_status == BetaStatus.APPROVED or
+                "beta" in self.grades_list or
+                self.is_pro)
 
     @property
     def is_locked(self) -> bool:
         if self.locked_until and self.locked_until > datetime.now(timezone.utc):
             return True
         return False
+
+
+class EmailLog(Base):
+    """Historique des emails envoyés depuis le panel admin."""
+    __tablename__ = "email_logs"
+
+    id           = Column(Integer, primary_key=True, index=True)
+    sender_id    = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    recipient_email = Column(String(255), nullable=False)
+    subject      = Column(String(500), nullable=False)
+    body_preview = Column(Text, nullable=True)   # premiers 300 chars
+    target_group = Column(String(100), nullable=True)  # "all", "beta", "pro", etc.
+    sent_count   = Column(Integer, default=1)
+    status       = Column(String(20), default="sent")  # sent / failed
+    created_at   = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
 
 class WorkDay(Base):
