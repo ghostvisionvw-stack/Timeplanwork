@@ -255,7 +255,7 @@ select option{background:#1a1d27;}
 
   <!-- TOTAUX -->
   <div class="totaux-card" id="bloc-totaux" style="display:none">
-    <h2>📊 Récapitulatif</h2>
+    <h2>📊 Récapitulatif <span id="recap-titre" style="color:var(--muted);font-size:12px;font-weight:400;text-transform:none;letter-spacing:0"></span></h2>
     <div class="stat-grid">
       <div class="stat-box"><div class="val blue" id="tot-jours">0</div><div class="lbl">Jours travaillés</div></div>
       <div class="stat-box"><div class="val orange" id="tot-samedis">0</div><div class="lbl">Jours spéciaux</div></div>
@@ -272,7 +272,7 @@ select option{background:#1a1d27;}
   <!-- LISTE -->
   <div class="list-card">
     <div class="list-header">
-      <h2>📋 Historique</h2>
+      <h2 id="historique-titre">📋 Historique</h2>
       <div class="export-btns">
         <button class="btn-export" onclick="toggleExport()">📋 Export texte</button>
         <button class="btn-export" onclick="exportPDF(false)" style="border-color:var(--accent);color:var(--accent)">📄 PDF jour/jour</button>
@@ -535,7 +535,6 @@ async function loadFromDB() {
 
 async function exportPDF(parMois = false) {
   if (!TOKEN) { alert('Connectez-vous pour exporter en PDF.'); return; }
-  // Verifier acces beta ou admin
   const _user = JSON.parse(localStorage.getItem('user') || 'null');
   if (_user && !_user.is_admin && !_user.is_pro) {
     try {
@@ -547,10 +546,15 @@ async function exportPDF(parMois = false) {
       }
     } catch(e) {}
   }
-  // Sync d'abord pour s'assurer que toutes les données sont en DB
   await syncDB();
   try {
-    const url = parMois ? '/api/workdays/export/pdf?mode=monthly' : '/api/workdays/export/pdf';
+    // Construire l'URL avec les paramètres
+    let url = '/api/workdays/export/pdf';
+    const params = new URLSearchParams();
+    if (parMois) params.set('mode', 'monthly');
+    if (filtreActif !== 'tous') params.set('mois', filtreActif); // ex: 2025-10
+    if (params.toString()) url += '?' + params.toString();
+
     const res = await fetch(url, { headers:{'Authorization':'Bearer '+TOKEN} });
     if (res.status === 402) { alert("L'export PDF est réservé aux beta testeurs et abonnés Pro."); return; }
     if (res.status === 404) { alert('Aucune journée enregistrée à exporter.'); return; }
@@ -558,8 +562,9 @@ async function exportPDF(parMois = false) {
     const blob = await res.blob();
     const objUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
+    const moisSuffix = filtreActif !== 'tous' ? '_' + filtreActif : '';
     const suffix = parMois ? 'RecapMensuel' : 'Rapport';
-    a.href=objUrl; a.download=`TimePlan_${suffix}_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.href=objUrl; a.download=`TimePlan_${suffix}${moisSuffix}_${new Date().toISOString().split('T')[0]}.pdf`;
     a.click(); URL.revokeObjectURL(objUrl);
   } catch(e) { alert('Erreur réseau. Réessayez.'); }
 }
@@ -836,22 +841,43 @@ async function supprimerJour(date) {
 
 // ── TOTAUX ──
 function calculerTotaux() {
-  const travailles=jours.filter(j=>j.type!=='chomage');
-  const samedis=jours.filter(j=>j.type==='samedi');
-  const totalReelles=travailles.reduce((s,j)=>s+(j.reellesMin||0),0);
-  const totalPayees=travailles.reduce((s,j)=>s+(j.payeesMin||0),0);
-  const totalEcart=totalReelles-totalPayees;
-  document.getElementById('tot-jours').textContent=travailles.length;
-  document.getElementById('tot-samedis').textContent=samedis.length;
-  document.getElementById('tot-reelles').textContent=minToStrAbs(totalReelles);
-  document.getElementById('tot-payees').textContent=minToStrAbs(totalPayees);
-  const ecartEl=document.getElementById('ecart-total');
-  const ecartBloc=document.getElementById('bloc-ecart');
-  ecartEl.textContent=minToStr(totalEcart);
-  if(totalEcart>0){ecartBloc.className='total-ecart';ecartEl.style.color='var(--green)';document.getElementById('ecart-label').textContent='heures supplémentaires non rémunérées';}
-  else if(totalEcart<0){ecartBloc.className='total-ecart negatif';ecartEl.style.color='var(--red)';document.getElementById('ecart-label').textContent='heures manquantes (vérifier les données)';}
-  else{ecartEl.style.color='var(--muted)';document.getElementById('ecart-label').textContent='aucun écart détecté';}
-  document.getElementById('bloc-totaux').style.display=jours.length>0?'block':'none';
+  // Filtrer selon le mois actif
+  const source = filtreActif === 'tous' ? jours : jours.filter(j => getMoisKey(j.date) === filtreActif);
+  const travailles = source.filter(j => j.type !== 'chomage');
+  const samedis = source.filter(j => j.type === 'samedi');
+  const totalReelles = travailles.reduce((s,j) => s+(j.reellesMin||0), 0);
+  const totalPayees  = travailles.reduce((s,j) => s+(j.payeesMin||0), 0);
+  const totalEcart   = totalReelles - totalPayees;
+
+  document.getElementById('tot-jours').textContent = travailles.length;
+  document.getElementById('tot-samedis').textContent = samedis.length;
+  document.getElementById('tot-reelles').textContent = minToStrAbs(totalReelles);
+  document.getElementById('tot-payees').textContent  = minToStrAbs(totalPayees);
+
+  const ecartEl   = document.getElementById('ecart-total');
+  const ecartBloc = document.getElementById('bloc-ecart');
+  ecartEl.textContent = minToStr(totalEcart);
+  if (totalEcart > 0) {
+    ecartBloc.className = 'total-ecart';
+    ecartEl.style.color = 'var(--green)';
+    document.getElementById('ecart-label').textContent = 'heures supplémentaires non rémunérées';
+  } else if (totalEcart < 0) {
+    ecartBloc.className = 'total-ecart negatif';
+    ecartEl.style.color = 'var(--red)';
+    document.getElementById('ecart-label').textContent = 'heures manquantes (vérifier les données)';
+  } else {
+    ecartEl.style.color = 'var(--muted)';
+    document.getElementById('ecart-label').textContent = 'aucun écart détecté';
+  }
+
+  // Titre dynamique récap + historique
+  const titreSuffix = filtreActif === 'tous' ? '— toutes périodes' : '— ' + getMoisLabel(filtreActif + '-01');
+  document.getElementById('recap-titre').textContent = titreSuffix;
+  document.getElementById('historique-titre').textContent = filtreActif === 'tous'
+    ? '📋 Historique — Tous'
+    : '📋 ' + getMoisLabel(filtreActif + '-01');
+
+  document.getElementById('bloc-totaux').style.display = jours.length > 0 ? 'block' : 'none';
   majInfoLegal();
 }
 
@@ -859,7 +885,9 @@ function calculerTotaux() {
 function filtrer(mois,el) {
   filtreActif=mois;
   document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
-  el.classList.add('active'); rendreListe();
+  el.classList.add('active');
+  rendreListe();
+  calculerTotaux();
 }
 
 function mettreAJourFiltres() {

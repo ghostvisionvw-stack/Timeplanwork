@@ -114,6 +114,7 @@ async def add_workday(
 @router.get("/export/pdf")
 async def export_pdf(
     mode: Optional[str] = None,
+    mois: Optional[str] = None,
     current_user: User = Depends(require_pro),
     db: Session = Depends(get_db)
 ):
@@ -124,9 +125,17 @@ async def export_pdf(
     from reportlab.lib.colors import HexColor
     import io
 
-    days = db.query(WorkDay).filter(WorkDay.user_id == current_user.id).order_by(WorkDay.date).all()
-    if not days:
+    days_all = db.query(WorkDay).filter(WorkDay.user_id == current_user.id).order_by(WorkDay.date).all()
+    if not days_all:
         raise HTTPException(status_code=404, detail="Aucune journée enregistrée.")
+
+    # Filtrer par mois si demandé (ex: mois=2025-10)
+    if mois:
+        days = [d for d in days_all if d.date[:7] == mois]
+        if not days:
+            raise HTTPException(status_code=404, detail=f"Aucune journée pour {mois}.")
+    else:
+        days = days_all
 
     # ── Labels lisibles ──
     TYPE_LABELS = {
