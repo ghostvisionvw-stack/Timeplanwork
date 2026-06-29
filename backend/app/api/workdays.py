@@ -110,24 +110,10 @@ async def add_workday(
     db.commit()
     return {"message": "Journée enregistrée."}
 
-# ── DELETE ──
-@router.delete("/{date}")
-async def delete_workday(
-    date: str,
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-    wd = db.query(WorkDay).filter(
-        WorkDay.user_id == current_user.id, WorkDay.date == date
-    ).first()
-    if not wd:
-        raise HTTPException(status_code=404, detail="Journée introuvable.")
-    db.delete(wd); db.commit()
-    return {"message": "Journée supprimée."}
-
 # ── EXPORT PDF ──
 @router.get("/export/pdf")
 async def export_pdf(
+    mode: Optional[str] = None,
     current_user: User = Depends(require_pro),
     db: Session = Depends(get_db)
 ):
@@ -200,6 +186,100 @@ async def export_pdf(
     c = canvas.Canvas(buffer, pagesize=A4)
     page_num = [0]
 
+    # ══════════════════════════════════════
+    # MODE RÉCAP MENSUEL (une page par mois)
+    # ══════════════════════════════════════
+    if mode == 'monthly':
+        def new_page_m():
+            page_num[0] += 1
+            c.setFillColor(BG); c.rect(0, 0, W, H, fill=1, stroke=0)
+            c.setFillColor(ACCENT); c.rect(0, H-3*mm, W, 3*mm, fill=1, stroke=0)
+            c.setFillColor(ACCENT); c.rect(0, 0, W, 2.5*mm, fill=1, stroke=0)
+            c.setFillColor(MUTED); c.setFont('Helvetica', 7)
+            c.drawString(20*mm, 6*mm, 'TimePlan.work — Récapitulatif mensuel confidentiel')
+            c.drawRightString(W-20*mm, 6*mm, f'Page {page_num[0]}')
+
+        # Page de garde synthèse
+        new_page_m()
+        c.setFillColor(WHITE); c.setFont('Helvetica-Bold', 22)
+        c.drawString(20*mm, H-25*mm, 'Récapitulatif Mensuel')
+        c.setFillColor(ACCENT); c.setFont('Helvetica', 10)
+        c.drawString(20*mm, H-33*mm, f'Généré le {datetime.now().strftime("%d/%m/%Y")} — {current_user.full_name or current_user.email}')
+        c.setStrokeColor(ACCENT); c.setLineWidth(1.5)
+        c.line(20*mm, H-37*mm, W-20*mm, H-37*mm)
+
+        # Tableau synthèse tous les mois
+        ty = H-48*mm
+        c.setFillColor(MUTED); c.setFont('Helvetica-Bold', 7)
+        c.drawString(20*mm, ty+3*mm, '— SYNTHÈSE PAR MOIS')
+        c.setFillColor(BG3); c.rect(20*mm, ty-7*mm, W-40*mm, 8*mm, fill=1, stroke=0)
+        heads_m = [('MOIS', 45), ('JOURS', 22), ('HEURES RÉELLES', 38), ('HEURES DÉCLARÉES', 38), ('ÉCART MOIS', 28), ('CUMUL', 28)]
+        hx = 20*mm
+        for h, hw in heads_m:
+            c.setFillColor(MUTED); c.setFont('Helvetica-Bold', 6.5)
+            c.drawString(hx+2*mm, ty-3*mm, h); hx += hw*mm
+
+        ry2 = ty - 8*mm
+        cumul = 0
+        for mk, md in sorted(mois_data.items()):
+            em = md['reelles'] - md['payees']; cumul += em
+            ec = GREEN if em > 0 else RED if em < 0 else MUTED
+            cc = GREEN if cumul > 0 else RED
+            c.setFillColor(HexColor('#0f1420')); c.rect(20*mm, ry2-5*mm, W-40*mm, 6*mm, fill=1, stroke=0)
+            vx = 20*mm
+            for val, col, vw in [(fmt_mois(mk), TEXT, 45), (str(md['jours']), TEXT, 22), (mta(md['reelles']), ACCENT, 38), (mta(md['payees']), TEXT, 38), (mts(em), ec, 28), (mts(cumul), cc, 28)]:
+                c.setFillColor(col); c.setFont('Helvetica', 7.5); c.drawString(vx+2*mm, ry2-1.5*mm, val); vx += vw*mm
+            ry2 -= 7*mm
+
+        c.setStrokeColor(BORDER); c.setLineWidth(0.5); c.line(20*mm, ry2+1*mm, W-20*mm, ry2+1*mm)
+        c.setFillColor(TEXT); c.setFont('Helvetica-Bold', 8); c.drawString(22*mm, ry2-5*mm, 'TOTAL GÉNÉRAL')
+        c.setFillColor(GREEN if total_ecart >= 0 else RED); c.setFont('Helvetica-Bold', 11)
+        c.drawString(20*mm+(45+22+38+38)*mm+2*mm, ry2-5*mm, mts(total_ecart))
+
+        # Une page par mois avec détail des journées
+        for mk, md in sorted(mois_data.items()):
+            jours_mois = [d for d in days if d.date[:7] == mk]
+            c.showPage(); new_page_m()
+            c.setFillColor(ACCENT); c.setFont('Helvetica-Bold', 14)
+            c.drawString(20*mm, H-18*mm, fmt_mois(mk))
+            ecart_m = md['reelles'] - md['payees']
+            ec = GREEN if ecart_m > 0 else RED
+            c.setFillColor(ec); c.setFont('Helvetica-Bold', 10)
+            c.drawRightString(W-20*mm, H-18*mm, f'{md["jours"]} jours | {mta(md["reelles"])} réelles | {mta(md["payees"])} déclarées | {mts(ecart_m)}')
+            c.setStrokeColor(BORDER); c.setLineWidth(0.8); c.line(20*mm, H-22*mm, W-20*mm, H-22*mm)
+
+            ht = H-30*mm
+            c.setFillColor(BG3); c.rect(20*mm, ht-6*mm, W-40*mm, 7*mm, fill=1, stroke=0)
+            for hname, hw in [('DATE', 30),('TYPE',22),('DÉBUT',18),('FIN',18),('RÉEL',20),('DÉCLARÉ',22),('ÉCART',20),('NOTE',0)]:
+                c.setFillColor(MUTED); c.setFont('Helvetica-Bold', 6.5); c.drawString(20*mm+sum(v[1] for v in [('DATE',30),('TYPE',22),('DÉBUT',18),('FIN',18),('RÉEL',20),('DÉCLARÉ',22),('ÉCART',20),('NOTE',0)][:([('DATE',30),('TYPE',22),('DÉBUT',18),('FIN',18),('RÉEL',20),('DÉCLARÉ',22),('ÉCART',20),('NOTE',0)].index((hname,hw)))])*mm+2*mm, ht-2.5*mm, hname)
+
+            ry3 = ht - 7*mm
+            for i2, d in enumerate(jours_mois):
+                if i2 % 2 == 0: c.setFillColor(HexColor('#0f1420')); c.rect(20*mm, ry3-5*mm, W-40*mm, 6*mm, fill=1, stroke=0)
+                type_label = TYPE_LABELS.get(d.day_type, str(d.day_type))
+                ecart = d.gap_minutes or 0; ec2 = GREEN if ecart > 0 else RED if ecart < 0 else MUTED
+                vx = 20*mm
+                for val, col, vw in [(d.date, TEXT,30),(type_label,MUTED,22),(d.start_time or '—',TEXT,18),(d.end_time or '—',TEXT,18),(mta(d.real_minutes or 0),ACCENT,20),(mta(d.paid_minutes or 0),TEXT,22),(mts(ecart),ec2,20),((d.note or '')[:30],MUTED,0)]:
+                    c.setFillColor(col); c.setFont('Helvetica', 7); c.drawString(vx+2*mm, ry3-1.5*mm, str(val)); vx += vw*mm if vw else 0
+                ry3 -= 6*mm
+
+            # Total du mois
+            c.setStrokeColor(ACCENT); c.setLineWidth(1); c.line(20*mm, ry3, W-20*mm, ry3); ry3 -= 6*mm
+            c.setFillColor(BG2); c.roundRect(20*mm, ry3-8*mm, W-40*mm, 9*mm, 3, fill=1, stroke=0)
+            c.setFillColor(TEXT); c.setFont('Helvetica-Bold', 8)
+            c.drawString(24*mm, ry3-4*mm, f'TOTAL {fmt_mois(mk).upper()} : {md["jours"]} jours | {mta(md["reelles"])} réelles | {mta(md["payees"])} déclarées')
+            c.setFillColor(GREEN if ecart_m >= 0 else RED); c.setFont('Helvetica-Bold', 10)
+            c.drawRightString(W-24*mm, ry3-4.5*mm, f'ÉCART : {mts(ecart_m)}')
+
+        c.save(); buffer.seek(0)
+        nom = (current_user.full_name or 'utilisateur').replace(' ', '_')
+        filename = f"TimePlan_RecapMensuel_{nom}_{datetime.now().strftime('%Y%m%d')}.pdf"
+        return Response(content=buffer.read(), media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"})
+
+    # ══════════════════════════
+    # MODE JOUR PAR JOUR (défaut)
+    # ══════════════════════════
     def new_page(titre_suite=False):
         page_num[0] += 1
         c.setFillColor(BG)
@@ -469,3 +549,19 @@ async def export_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+# ── DELETE (doit être APRÈS /export/pdf pour éviter conflit de route) ──
+@router.delete("/{date}")
+async def delete_workday(
+    date: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    wd = db.query(WorkDay).filter(
+        WorkDay.user_id == current_user.id, WorkDay.date == date
+    ).first()
+    if not wd:
+        raise HTTPException(status_code=404, detail="Journée introuvable.")
+    db.delete(wd); db.commit()
+    logger.info(f"[DELETE] {current_user.email} — journée {date} supprimée")
+    return {"message": "Journée supprimée."}
