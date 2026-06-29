@@ -147,11 +147,7 @@ select option{background:#1a1d27;}
         </select>
       </div>
     </div>
-    <div class="field-row">
-      <div>
-        <label>Heures contractuelles / jour</label>
-        <input type="number" id="inp-heures-contrat" min="1" max="12" step="0.5" value="8" placeholder="8">
-      </div>
+    <div class="field-row single">
       <div>
         <label>Taux horaire (€)</label>
         <input type="number" id="inp-taux" min="0" step="0.01" placeholder="0.00">
@@ -279,7 +275,10 @@ select option{background:#1a1d27;}
       <h2>📋 Historique</h2>
       <div class="export-btns">
         <button class="btn-export" onclick="toggleExport()">📋 Export texte</button>
-        <button class="btn-export" onclick="exportPDF()" style="border-color:var(--accent);color:var(--accent)">📄 PDF Bêta/Pro</button>
+        <button class="btn-export" onclick="exportPDF(false)" style="border-color:var(--accent);color:var(--accent)">📄 PDF jour/jour</button>
+        <button class="btn-export" onclick="exportPDF(true)" style="border-color:#a78bfa;color:#a78bfa">📊 PDF récap/mois</button>
+        <button class="btn-export" onclick="supprimerMois()" style="border-color:var(--orange);color:var(--orange)">🗂 Suppr. mois</button>
+        <button class="btn-export" onclick="ouvrirSupprimerJour()" style="border-color:var(--red);color:var(--red)">🗑 Suppr. journée</button>
       </div>
     </div>
     <div class="filter-bar" id="filter-bar">
@@ -408,7 +407,6 @@ function sauvegarderParams() {
   const params = {
     pays: document.getElementById('inp-pays').value,
     convention: document.getElementById('inp-convention').value,
-    heuresContrat: document.getElementById('inp-heures-contrat').value,
     taux: document.getElementById('inp-taux').value,
   };
   localStorage.setItem('tp_params', JSON.stringify(params));
@@ -419,7 +417,6 @@ function chargerParams() {
     const p = JSON.parse(localStorage.getItem('tp_params') || '{}');
     if (p.pays) { document.getElementById('inp-pays').value = p.pays; majConventions(); }
     if (p.convention) document.getElementById('inp-convention').value = p.convention;
-    if (p.heuresContrat) document.getElementById('inp-heures-contrat').value = p.heuresContrat;
     if (p.taux) document.getElementById('inp-taux').value = p.taux;
   } catch(e) {}
 }
@@ -536,7 +533,7 @@ async function loadFromDB() {
   finally { dbLoaded = true; rendreListe(); calculerTotaux(); }
 }
 
-async function exportPDF() {
+async function exportPDF(parMois = false) {
   if (!TOKEN) { alert('Connectez-vous pour exporter en PDF.'); return; }
   // Verifier acces beta ou admin
   const _user = JSON.parse(localStorage.getItem('user') || 'null');
@@ -545,7 +542,7 @@ async function exportPDF() {
       const _sr = await fetch('/api/beta/status', { headers: {'Authorization':'Bearer '+TOKEN} });
       const _sd = await _sr.json();
       if (!_sd.has_access && !_sd.is_pro) {
-        alert("L'export PDF est reserve aux beta testeurs et aux abonnes Pro.\nDemandez votre acces beta depuis votre dashboard.");
+        alert("L'export PDF est reservé aux beta testeurs et aux abonnés Pro.\nDemandez votre accès beta depuis votre dashboard.");
         return;
       }
     } catch(e) {}
@@ -553,16 +550,82 @@ async function exportPDF() {
   // Sync d'abord pour s'assurer que toutes les données sont en DB
   await syncDB();
   try {
-    const res = await fetch('/api/workdays/export/pdf', { headers:{'Authorization':'Bearer '+TOKEN} });
-    if (res.status === 402) { alert("L'export PDF est reserve aux beta testeurs et abonnes Pro."); return; }
+    const url = parMois ? '/api/workdays/export/pdf?mode=monthly' : '/api/workdays/export/pdf';
+    const res = await fetch(url, { headers:{'Authorization':'Bearer '+TOKEN} });
+    if (res.status === 402) { alert("L'export PDF est réservé aux beta testeurs et abonnés Pro."); return; }
     if (res.status === 404) { alert('Aucune journée enregistrée à exporter.'); return; }
     if (!res.ok) { const d=await res.json(); alert(d.detail||'Erreur PDF.'); return; }
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
+    const objUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href=url; a.download=`TimePlan_Rapport_${new Date().toISOString().split('T')[0]}.pdf`;
-    a.click(); URL.revokeObjectURL(url);
+    const suffix = parMois ? 'RecapMensuel' : 'Rapport';
+    a.href=objUrl; a.download=`TimePlan_${suffix}_${new Date().toISOString().split('T')[0]}.pdf`;
+    a.click(); URL.revokeObjectURL(objUrl);
   } catch(e) { alert('Erreur réseau. Réessayez.'); }
+}
+
+// ── SUPPRIMER UN MOIS ENTIER ──
+async function supprimerMois() {
+  const moisUniques = [...new Set(jours.map(j => getMoisKey(j.date)))].sort();
+  if (moisUniques.length === 0) { alert('Aucune donnée à supprimer.'); return; }
+
+  // Construire la liste des mois disponibles
+  const options = moisUniques.map((m, i) => `${i + 1}. ${getMoisLabel(m + '-01')}`).join('\n');
+  const choix = prompt(`Quel mois supprimer ?\n\n${options}\n\nEntrez le numéro :`);
+  if (!choix) return;
+  const idx = parseInt(choix) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= moisUniques.length) { alert('Numéro invalide.'); return; }
+
+  const moisKey = moisUniques[idx];
+  const label = getMoisLabel(moisKey + '-01');
+  const nb = jours.filter(j => getMoisKey(j.date) === moisKey).length;
+
+  if (!confirm(`Supprimer ${nb} journée(s) de ${label} ?\n\nCette action est irréversible.`)) return;
+
+  // Dates à supprimer
+  const datesASuppr = jours.filter(j => getMoisKey(j.date) === moisKey).map(j => j.date);
+  jours = jours.filter(j => getMoisKey(j.date) !== moisKey);
+  sauvegarder(); rendreListe(); calculerTotaux();
+
+  // Supprimer en DB
+  if (TOKEN) {
+    setSyncStatus('syncing');
+    let erreurs = 0;
+    for (const date of datesASuppr) {
+      try {
+        const res = await fetch('/api/workdays/' + date, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + TOKEN } });
+        if (!res.ok && res.status !== 404) erreurs++;
+      } catch(e) { erreurs++; }
+    }
+    setSyncStatus(erreurs > 0 ? 'error' : 'ok');
+    if (erreurs > 0) alert(`${erreurs} journée(s) n'ont pas pu être supprimées du serveur.`);
+  }
+}
+
+// ── SUPPRIMER UNE JOURNÉE PAR SÉLECTION ──
+function ouvrirSupprimerJour() {
+  if (jours.length === 0) { alert('Aucune journée enregistrée.'); return; }
+
+  // Utiliser les données filtrées si un mois est actif
+  const liste = filtreActif === 'tous'
+    ? [...jours].sort((a,b) => b.date.localeCompare(a.date))
+    : [...jours].filter(j => getMoisKey(j.date) === filtreActif).sort((a,b) => b.date.localeCompare(a.date));
+
+  if (liste.length === 0) { alert('Aucune journée dans ce filtre.'); return; }
+
+  const options = liste.map((j, i) => {
+    const type = j.type === 'chomage' ? '💤 Absence' : j.type === 'samedi' ? '📅 Samedi' : '⏱ Travail';
+    return `${i + 1}. ${formatDate(j.date)} — ${type}`;
+  }).join('\n');
+
+  const choix = prompt(`Quelle journée supprimer ?\n\n${options}\n\nEntrez le numéro :`);
+  if (!choix) return;
+  const idx = parseInt(choix) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= liste.length) { alert('Numéro invalide.'); return; }
+
+  const jour = liste[idx];
+  if (!confirm(`Supprimer la journée du ${formatDate(jour.date)} ?`)) return;
+  supprimerJour(jour.date);
 }
 
 // ── UTILS ──
@@ -723,7 +786,7 @@ function ajouterJour() {
   sauvegarderParams();
   document.getElementById('inp-fin').value='';
   document.getElementById('inp-note').value='';
-  document.getElementById('inp-paye').value=document.getElementById('inp-heures-contrat').value||'8';
+  document.getElementById('inp-paye').value='8';
   document.getElementById('inp-type').value='travail';
   document.getElementById('zone-heures').style.display='block';
   document.getElementById('zone-chomage').style.display='none';
@@ -921,7 +984,7 @@ document.getElementById('inp-type').addEventListener('change', function() {
   document.getElementById('zone-heures').style.display=this.value==='chomage'?'none':'block';
   document.getElementById('zone-chomage').style.display=this.value==='chomage'?'block':'none';
 });
-['inp-pays','inp-convention','inp-heures-contrat','inp-taux'].forEach(id=>{
+['inp-pays','inp-convention','inp-taux'].forEach(id=>{
   document.getElementById(id)?.addEventListener('change', sauvegarderParams);
 });
 
