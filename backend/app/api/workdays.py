@@ -460,7 +460,7 @@ async def export_pdf(
 
     # Headers tableau
     table_y = H-26*mm
-    headers = [('DATE', 26), ('TYPE', 22), ('DÉBUT', 16), ('FIN', 16), ('RÉEL', 16), ('DÉCLARÉ', 18), ('ÉCART', 18), ('NOTE', 0)]
+    headers = [('DATE', 24), ('TYPE', 18), ('DÉBUT', 14), ('FIN', 14), ('RÉEL', 14), ('DÉCLARÉ', 16), ('ÉCART', 16), ('NOTE', 54)]
     col_widths = [d[1] for d in headers]
 
     def draw_table_header(ty):
@@ -470,7 +470,7 @@ async def export_pdf(
         for hname, hw in headers:
             c.setFillColor(MUTED); c.setFont('Helvetica-Bold', 6.5)
             c.drawString(hx+2*mm, ty-2.5*mm, hname)
-            hx += hw*mm if hw else 0
+            hx += hw*mm
 
     draw_table_header(table_y)
     row_y = table_y - 7*mm
@@ -517,23 +517,23 @@ async def export_pdf(
         ecart_col = GREEN if ecart > 0 else RED if ecart < 0 else MUTED
 
         # Note tronquée
-        note = (d.note or '')[:25]
+        note = (d.note or '')[:60]
 
         row_vals = [
-            (d.date, TEXT, 26),
-            (type_label, MUTED if type_label == 'Travail' else ORANGE, 22),
-            (d.start_time or '—', TEXT, 16),
-            (d.end_time or '—', TEXT, 16),
-            (mta(d.real_minutes or 0), ACCENT, 16),
-            (mta(d.paid_minutes or 0), TEXT, 18),
-            (mts(ecart), ecart_col, 18),
-            (note, MUTED, 0),
+            (d.date, TEXT, 24),
+            (type_label, MUTED if type_label == 'Travail' else ORANGE, 18),
+            (d.start_time or '—', TEXT, 14),
+            (d.end_time or '—', TEXT, 14),
+            (mta(d.real_minutes or 0), ACCENT, 14),
+            (mta(d.paid_minutes or 0), TEXT, 16),
+            (mts(ecart), ecart_col, 16),
+            (note, MUTED, 54),
         ]
         rx = 20*mm
         for val, col, rw in row_vals:
             c.setFillColor(col); c.setFont('Helvetica', 7)
             c.drawString(rx+2*mm, row_y-1.5*mm, str(val))
-            rx += rw*mm if rw else 0
+            rx += rw*mm
         row_y -= 6*mm
 
     # Ligne total finale
