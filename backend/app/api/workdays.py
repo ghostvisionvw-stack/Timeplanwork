@@ -315,7 +315,7 @@ async def export_pdf(
     c.setFillColor(ACCENT)
     c.drawString(74*mm, H-16*mm, '.work')
     c.setFillColor(TEXT); c.setFont('Helvetica-Bold', 18)
-    c.drawRightString(W-20*mm, H-16*mm, 'RAPPORT JURIDIQUE')
+    c.drawRightString(W-20*mm, H-16*mm, 'RAPPORT DES HEURES')
     c.setFillColor(MUTED); c.setFont('Helvetica', 9)
     c.drawRightString(W-20*mm, H-22*mm, f'Généré le {datetime.now().strftime("%d/%m/%Y à %H:%M")} — CONFIDENTIEL')
 
