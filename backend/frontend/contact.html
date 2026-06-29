@@ -275,7 +275,15 @@
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     }
 
+    function showStatus(type, text) {
+      const status = document.getElementById('form-status');
+      status.className = 'form-status ' + type;
+      status.style.display = 'block';
+      status.textContent = text;
+    }
+
     async function envoyerMessage() {
+      console.log('[CONTACT] Clic détecté, début envoi');
       const nom = document.getElementById('nom').value.trim();
       const email = document.getElementById('email').value.trim();
       const sujet = document.getElementById('sujet').value;
@@ -283,15 +291,19 @@
       const status = document.getElementById('form-status');
       const btn = document.getElementById('btn-send');
 
-      // Validation
+      console.log('[CONTACT] Données:', { nom, email, sujet, messageLength: message.length });
+
+      // Validation côté client
       if (!nom || !email || !message) {
-        status.className = 'form-status error';
-        status.textContent = '⚠️ Merci de remplir tous les champs.';
+        showStatus('error', '⚠️ Merci de remplir tous les champs (nom, email, message).');
+        return;
+      }
+      if (message.length < 10) {
+        showStatus('error', '⚠️ Le message doit faire au moins 10 caractères (actuellement ' + message.length + ').');
         return;
       }
       if (!isValidEmail(email)) {
-        status.className = 'form-status error';
-        status.textContent = '⚠️ Adresse email invalide.';
+        showStatus('error', '⚠️ Adresse email invalide.');
         return;
       }
 
@@ -301,29 +313,32 @@
       status.style.display = 'none';
 
       try {
+        console.log('[CONTACT] Envoi vers /api/contact/');
         const res = await fetch('/api/contact/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ nom, email, sujet, message })
         });
 
+        console.log('[CONTACT] Réponse status:', res.status);
+        const d = await res.json().catch(() => ({}));
+        console.log('[CONTACT] Réponse body:', d);
+
         if (res.ok) {
-          status.className = 'form-status success';
-          status.textContent = '✅ Message envoyé ! Nous te répondrons rapidement.';
+          showStatus('success', '✅ Message envoyé ! Nous te répondrons rapidement.');
           document.getElementById('nom').value = '';
           document.getElementById('email').value = '';
           document.getElementById('message').value = '';
         } else if (res.status === 429) {
-          status.className = 'form-status error';
-          status.textContent = '⏳ Merci de patienter quelques secondes avant de renvoyer un message.';
+          showStatus('error', '⏳ ' + (d.detail || 'Merci de patienter quelques secondes avant de renvoyer un message.'));
+        } else if (res.status === 422) {
+          showStatus('error', '❌ Données invalides. Vérifie le format de l\'email et le message.');
         } else {
-          const d = await res.json().catch(() => ({}));
-          status.className = 'form-status error';
-          status.textContent = '❌ ' + (d.detail || 'Erreur lors de l\'envoi. Réessaie ou écris directement à contact@timeplanwork.com');
+          showStatus('error', '❌ ' + (d.detail || ('Erreur ' + res.status + '. Écris-nous à contact@timeplanwork.com')));
         }
       } catch (e) {
-        status.className = 'form-status error';
-        status.textContent = '❌ Erreur réseau. Écris-nous directement à contact@timeplanwork.com';
+        console.error('[CONTACT] Erreur:', e);
+        showStatus('error', '❌ Erreur réseau : ' + e.message + '. Écris-nous à contact@timeplanwork.com');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Envoyer le message';
