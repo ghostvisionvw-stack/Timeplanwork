@@ -275,8 +275,8 @@ select option{background:#1a1d27;}
       <h2 id="historique-titre">📋 Historique</h2>
       <div class="export-btns">
         <button class="btn-export" onclick="toggleExport()">📋 Export texte</button>
-        <button class="btn-export" onclick="exportPDF(false)" style="border-color:var(--accent);color:var(--accent)">📄 PDF jour/jour</button>
-        <button class="btn-export" onclick="exportPDF(true)" style="border-color:#a78bfa;color:#a78bfa">📊 PDF récap/mois</button>
+        <button class="btn-export" id="btn-pdf-mois" onclick="exportPDF(false)" style="border-color:var(--accent);color:var(--accent)">📄 PDF du mois</button>
+        <button class="btn-export" onclick="exportPDF(true)" style="border-color:#a78bfa;color:#a78bfa">📊 PDF tous les mois</button>
         <button class="btn-export" onclick="supprimerMois()" style="border-color:var(--orange);color:var(--orange)">🗂 Suppr. mois</button>
         <button class="btn-export" onclick="ouvrirSupprimerJour()" style="border-color:var(--red);color:var(--red)">🗑 Suppr. journée</button>
       </div>
@@ -535,6 +535,13 @@ async function loadFromDB() {
 
 async function exportPDF(parMois = false) {
   if (!TOKEN) { alert('Connectez-vous pour exporter en PDF.'); return; }
+
+  // PDF du mois : bloquer si aucun mois sélectionné
+  if (!parMois && filtreActif === 'tous') {
+    alert('Sélectionnez un mois dans le filtre pour exporter le PDF du mois.');
+    return;
+  }
+
   const _user = JSON.parse(localStorage.getItem('user') || 'null');
   if (_user && !_user.is_admin && !_user.is_pro) {
     try {
@@ -548,12 +555,10 @@ async function exportPDF(parMois = false) {
   }
   await syncDB();
   try {
-    // Construire l'URL avec les paramètres
-    let url = '/api/workdays/export/pdf';
     const params = new URLSearchParams();
     if (parMois) params.set('mode', 'monthly');
-    if (filtreActif !== 'tous') params.set('mois', filtreActif); // ex: 2025-10
-    if (params.toString()) url += '?' + params.toString();
+    if (!parMois && filtreActif !== 'tous') params.set('mois', filtreActif);
+    const url = '/api/workdays/export/pdf' + (params.toString() ? '?' + params.toString() : '');
 
     const res = await fetch(url, { headers:{'Authorization':'Bearer '+TOKEN} });
     if (res.status === 402) { alert("L'export PDF est réservé aux beta testeurs et abonnés Pro."); return; }
@@ -888,6 +893,17 @@ function filtrer(mois,el) {
   el.classList.add('active');
   rendreListe();
   calculerTotaux();
+  // Bouton PDF du mois : actif seulement si un mois est sélectionné
+  const btnPdfMois = document.getElementById('btn-pdf-mois');
+  if (mois === 'tous') {
+    btnPdfMois.style.opacity = '0.35';
+    btnPdfMois.style.cursor = 'not-allowed';
+    btnPdfMois.title = 'Sélectionnez un mois pour exporter';
+  } else {
+    btnPdfMois.style.opacity = '1';
+    btnPdfMois.style.cursor = 'pointer';
+    btnPdfMois.title = '';
+  }
 }
 
 function mettreAJourFiltres() {
