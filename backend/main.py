@@ -9,7 +9,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.middleware import SecurityMiddleware
 from app.core.database import engine, Base
-from app.api import auth, admin, stripe_webhook, beta, workdays, feedback
+from app.api import auth, admin, stripe_webhook, beta, workdays, feedback, contact
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ app.include_router(beta.router)
 app.include_router(stripe_webhook.router)
 app.include_router(workdays.router)
 app.include_router(feedback.router)
+app.include_router(contact.router)
 
 # ── HEALTH ──
 @app.get("/health")
@@ -104,6 +105,10 @@ async def confidentialite():
 @app.get("/cgu")
 async def cgu():
     return FileResponse(FRONTEND_DIR / "cgu.html")
+
+@app.get("/contact")
+async def contact_page():
+    return FileResponse(FRONTEND_DIR / "contact.html")
 
 # ── STATIQUES ──
 if FRONTEND_DIR.exists():
