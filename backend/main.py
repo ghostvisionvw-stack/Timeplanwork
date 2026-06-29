@@ -93,6 +93,18 @@ async def dashboard_page():
 async def admin_page():
     return FileResponse(FRONTEND_DIR / "admin.html")
 
+@app.get("/mentions-legales")
+async def mentions_legales():
+    return FileResponse(FRONTEND_DIR / "mentions-legales.html")
+
+@app.get("/confidentialite")
+async def confidentialite():
+    return FileResponse(FRONTEND_DIR / "confidentialite.html")
+
+@app.get("/cgu")
+async def cgu():
+    return FileResponse(FRONTEND_DIR / "cgu.html")
+
 # ── STATIQUES ──
 if FRONTEND_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(FRONTEND_DIR)), name="static")
