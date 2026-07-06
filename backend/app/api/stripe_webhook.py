@@ -1,194 +1,300 @@
+import hashlib
 import logging
-import stripe
-from datetime import datetime, timezone
-from fastapi import APIRouter, Request, HTTPException, Header, Depends
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr, field_validator
+from typing import Optional
+from app.core.security import (
+    hash_password, verify_password, validate_password_strength,
+    create_access_token, create_refresh_token, decode_token,
+    create_reset_token, verify_reset_token
+)
 from app.core.config import settings
-from app.models.models import User, SubscriptionStatus, AuditLog
-from app.core.database import get_db, get_db_sync
-from app.api.auth import get_current_user
+from app.models.models import User, RefreshToken, AuditLog, ensure_utc
+from app.core.database import get_db
+from app.core.email import send_reset_password_email
 
-router = APIRouter(prefix="/api/stripe", tags=["stripe"])
+router = APIRouter(prefix="/api/auth", tags=["auth"])
+security = HTTPBearer()
 logger = logging.getLogger(__name__)
 
-stripe.api_key = settings.STRIPE_SECRET_KEY
+# ── SCHEMAS ──
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
 
-# ── CRÉER SESSION CHECKOUT ──
-@router.post("/create-checkout")
-async def create_checkout(
+    @field_validator("password")
+    @classmethod
+    def password_strong(cls, v):
+        ok, msg = validate_password_strength(v)
+        if not ok:
+            raise ValueError(msg)
+        return v
+
+    @field_validator("full_name")
+    @classmethod
+    def name_valid(cls, v):
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Le nom doit contenir au moins 2 caractères.")
+        if len(v) > 255:
+            raise ValueError("Le nom est trop long (255 caractères maximum).")
+        return v
+
+class LoginRequest(BaseModel):
+    email: EmailStr
+    password: str
+
+class RefreshRequest(BaseModel):
+    refresh_token: str
+
+class ResetRequest(BaseModel):
+    email: EmailStr
+
+class NewPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+    @field_validator("new_password")
+    @classmethod
+    def password_strong(cls, v):
+        ok, msg = validate_password_strength(v)
+        if not ok:
+            raise ValueError(msg)
+        return v
+
+class UpdateProfileRequest(BaseModel):
+    full_name: Optional[str] = None
+    address: Optional[str] = None
+    country: Optional[str] = None
+    collective_agreement: Optional[str] = None
+
+# ── HELPERS ──
+def _get_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+def _get_ua(request: Request) -> str:
+    return request.headers.get("user-agent", "")[:500]
+
+def log_audit(db: Session, user_id, action: str, request: Request, details: str = None):
+    log = AuditLog(
+        user_id=user_id, action=action,
+        ip_address=_get_ip(request), user_agent=_get_ua(request), details=details
+    )
+    db.add(log)
+    user_info = f"user_id:{user_id}" if user_id else "anonymous"
+    logger.info(f"[AUDIT] {action} | {user_info} | ip:{_get_ip(request)}" + (f" | {details}" if details else ""))
+
+# ── DÉPENDANCES AUTH ──
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    payload = decode_token(credentials.credentials)
+    if not payload or payload.get("type") != "access":
+        raise HTTPException(status_code=401, detail="Non authentifié.")
+    user = db.query(User).filter(User.id == int(payload["sub"])).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable.")
+    return user
+
+def get_current_admin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs.")
+    return current_user
+
+def require_pro(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.is_pro:
+        raise HTTPException(status_code=402, detail="Fonctionnalité réservée aux abonnés Pro.")
+    return current_user
+
+# ── REGISTER ──
+@router.post("/register", status_code=201)
+async def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
+    existing = db.query(User).filter(User.email == body.email.lower()).first()
+    if existing:
+        log_audit(db, None, "register_duplicate", request, f"email:{body.email.lower()}")
+        db.commit()
+        raise HTTPException(status_code=400, detail="Inscription impossible. Vérifiez vos informations.")
+    user = User(
+        email=body.email.lower(), hashed_password=hash_password(body.password),
+        full_name=body.full_name, is_active=True,
+    )
+    db.add(user); db.commit(); db.refresh(user)
+    log_audit(db, user.id, "register_success", request, f"email:{user.email}")
+    db.commit()
+    logger.info(f"[NEW_USER] {user.email} | ip:{_get_ip(request)}")
+    return {"message": "Compte créé. Bienvenue sur TimePlan.work !"}
+
+# ── LOGIN ──
+@router.post("/login")
+async def login(body: LoginRequest, request: Request, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == body.email.lower()).first()
+    ip = _get_ip(request)
+    if user and user.is_locked:
+        log_audit(db, user.id, "login_locked", request, f"email:{user.email}")
+        db.commit()
+        raise HTTPException(status_code=423, detail="Compte temporairement verrouillé. Réessayez plus tard.")
+    if not user or not verify_password(body.password, user.hashed_password):
+        if user:
+            user.failed_login_count += 1
+            if user.failed_login_count >= 5:
+                user.locked_until = datetime.now(timezone.utc) + timedelta(minutes=15)
+                log_audit(db, user.id, "account_locked", request, f"attempts:{user.failed_login_count}")
+            else:
+                log_audit(db, user.id, "login_failed", request, f"attempt:{user.failed_login_count}")
+            db.commit()
+        else:
+            logger.warning(f"[LOGIN_UNKNOWN] email:{body.email.lower()} | ip:{ip}")
+        raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+    if not user.is_active:
+        log_audit(db, user.id, "login_inactive", request); db.commit()
+        raise HTTPException(status_code=403, detail="Compte désactivé. Contactez le support.")
+    user.failed_login_count = 0; user.locked_until = None
+    user.last_login_at = datetime.now(timezone.utc)
+    access_token = create_access_token(user.id, user.email)
+    refresh_token_raw = create_refresh_token(user.id)
+    token_hash = hashlib.sha256(refresh_token_raw.encode()).hexdigest()
+    db.add(RefreshToken(
+        user_id=user.id, token_hash=token_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        ip_address=ip, user_agent=_get_ua(request)
+    ))
+    log_audit(db, user.id, "login_success", request, f"email:{user.email}")
+    db.commit()
+    logger.info(f"[LOGIN_OK] {user.email} | admin:{user.is_admin} | ip:{ip}")
+    return {
+        "access_token": access_token, "refresh_token": refresh_token_raw, "token_type": "bearer",
+        "user": {
+            "id": user.id, "email": user.email, "full_name": user.full_name,
+            "is_pro": user.is_pro, "is_admin": user.is_admin, "is_superadmin": user.is_superadmin,
+            "address": user.address if hasattr(user, 'address') else None,
+            "country": user.country, "collective_agreement": user.collective_agreement,
+        }
+    }
+
+# ── REFRESH TOKEN ──
+@router.post("/refresh")
+async def refresh_token(body: RefreshRequest, request: Request, db: Session = Depends(get_db)):
+    payload = decode_token(body.refresh_token)
+    if not payload or payload.get("type") != "refresh":
+        raise HTTPException(status_code=401, detail="Token invalide.")
+    token_hash = hashlib.sha256(body.refresh_token.encode()).hexdigest()
+    stored = db.query(RefreshToken).filter(
+        RefreshToken.token_hash == token_hash, RefreshToken.is_revoked == False
+    ).first()
+    if not stored or ensure_utc(stored.expires_at) < datetime.now(timezone.utc):
+        raise HTTPException(status_code=401, detail="Session expirée. Reconnectez-vous.")
+    user = db.query(User).filter(User.id == stored.user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Utilisateur introuvable.")
+    stored.is_revoked = True
+    new_refresh_raw = create_refresh_token(user.id)
+    new_hash = hashlib.sha256(new_refresh_raw.encode()).hexdigest()
+    db.add(RefreshToken(
+        user_id=user.id, token_hash=new_hash,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+        ip_address=_get_ip(request),
+    ))
+    log_audit(db, user.id, "token_refresh", request)
+    db.commit()
+    return {"access_token": create_access_token(user.id, user.email), "refresh_token": new_refresh_raw, "token_type": "bearer"}
+
+# ── LOGOUT ──
+@router.post("/logout")
+async def logout(body: RefreshRequest, request: Request, db: Session = Depends(get_db)):
+    token_hash = hashlib.sha256(body.refresh_token.encode()).hexdigest()
+    stored = db.query(RefreshToken).filter(RefreshToken.token_hash == token_hash).first()
+    if stored:
+        stored.is_revoked = True
+        log_audit(db, stored.user_id, "logout", request)
+        db.commit()
+    return {"message": "Déconnecté avec succès."}
+
+# ── RESET PASSWORD ──
+@router.post("/reset-password")
+async def request_reset(body: ResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == body.email.lower()).first()
+    if user and user.is_active:
+        token = create_reset_token(user.email)
+        background_tasks.add_task(send_reset_password_email, user.email, token)
+        logger.info(f"[RESET_PASSWORD_REQUEST] {user.email}")
+    return {"message": "Si cet email existe, un lien de réinitialisation vous a été envoyé."}
+
+@router.post("/reset-password/confirm")
+async def confirm_reset(body: NewPasswordRequest, request: Request, db: Session = Depends(get_db)):
+    email = verify_reset_token(body.token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Lien invalide ou expiré.")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+    # Usage unique : un token émis avant le dernier changement de mot de passe est refusé
+    payload = decode_token(body.token) or {}
+    issued_at = payload.get("iat")
+    if issued_at and user.password_changed_at:
+        token_time = datetime.fromtimestamp(issued_at, tz=timezone.utc)
+        if token_time <= ensure_utc(user.password_changed_at):
+            raise HTTPException(status_code=400, detail="Lien invalide ou expiré.")
+    user.hashed_password = hash_password(body.new_password)
+    user.password_changed_at = datetime.now(timezone.utc)
+    db.query(RefreshToken).filter(RefreshToken.user_id == user.id).update({"is_revoked": True})
+    log_audit(db, user.id, "password_reset", request)
+    db.commit()
+    return {"message": "Mot de passe modifié avec succès."}
+
+# ── MON PROFIL ──
+@router.get("/me")
+async def get_profile(current_user: User = Depends(get_current_user)):
+    return {
+        "id": current_user.id, "email": current_user.email,
+        "full_name": current_user.full_name,
+        "address": getattr(current_user, 'address', None),
+        "country": current_user.country,
+        "collective_agreement": current_user.collective_agreement,
+        "is_pro": current_user.is_pro, "is_admin": current_user.is_admin,
+        "created_at": current_user.created_at.isoformat(),
+        "last_login_at": current_user.last_login_at.isoformat() if current_user.last_login_at else None,
+    }
+
+@router.patch("/me")
+async def update_profile(
+    body: UpdateProfileRequest,
     request: Request,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Crée une session Stripe Checkout pour l'abonnement Pro."""
-    try:
-        # Créer ou récupérer le customer Stripe
-        if not current_user.stripe_customer_id:
-            customer = stripe.Customer.create(
-                email=current_user.email,
-                name=current_user.full_name,
-                metadata={"user_id": str(current_user.id)}
-            )
-            current_user.stripe_customer_id = customer.id
-            db.commit()
-        
-        base_url = str(request.base_url).rstrip('/')
-        
-        session = stripe.checkout.Session.create(
-            customer=current_user.stripe_customer_id,
-            client_reference_id=str(current_user.id),
-            payment_method_types=["card"],
-            line_items=[{
-                "price": settings.STRIPE_PRICE_PRO_MONTHLY,
-                "quantity": 1,
-            }],
-            mode="subscription",
-            success_url=f"{base_url}/dashboard?success=1",
-            cancel_url=f"{base_url}/dashboard?cancelled=1",
-            locale="fr",
-            subscription_data={
-                "metadata": {"user_id": str(current_user.id)}
-            }
-        )
-        
-        logger.info(f"[CHECKOUT] Session créée pour {current_user.email}")
-        return {"checkout_url": session.url}
-        
-    except stripe.error.StripeError as e:
-        logger.error(f"[CHECKOUT_ERROR] {current_user.email}: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
-# ── CRÉER SESSION PORTAIL CLIENT ──
-@router.post("/create-portal")
-async def create_portal(
-    request: Request,
-    current_user: User = Depends(get_current_user),
-):
-    """Crée une session Stripe Customer Portal pour gérer l'abonnement."""
-    if not current_user.stripe_customer_id:
-        raise HTTPException(status_code=400, detail="Aucun abonnement actif.")
-    
-    try:
-        base_url = str(request.base_url).rstrip('/')
-        session = stripe.billing_portal.Session.create(
-            customer=current_user.stripe_customer_id,
-            return_url=f"{base_url}/dashboard",
-        )
-        return {"portal_url": session.url}
-    except stripe.error.StripeError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-# ── WEBHOOK STRIPE ──
-@router.post("/webhook")
-async def stripe_webhook(
-    request: Request,
-    stripe_signature: str = Header(None, alias="stripe-signature")
-):
-    if not stripe_signature:
-        raise HTTPException(status_code=400, detail="Signature manquante.")
-
-    payload = await request.body()
-
-    try:
-        event = stripe.Webhook.construct_event(
-            payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET
-        )
-    except stripe.error.SignatureVerificationError:
-        logger.warning("Webhook Stripe — signature invalide")
-        raise HTTPException(status_code=400, detail="Signature invalide.")
-    except Exception as e:
-        logger.error(f"Webhook Stripe — erreur parsing: {e}")
-        raise HTTPException(status_code=400, detail="Payload invalide.")
-
-    logger.info(f"[WEBHOOK] {event['type']}")
-
-    db = next(get_db_sync())
-    try:
-        event_type = event["type"]
-        data = event["data"]["object"]
-
-        if event_type == "checkout.session.completed":
-            _handle_checkout_completed(db, data)
-        elif event_type == "customer.subscription.created":
-            _handle_sub_created(db, data)
-        elif event_type == "customer.subscription.updated":
-            _handle_sub_updated(db, data)
-        elif event_type == "customer.subscription.deleted":
-            _handle_sub_deleted(db, data)
-        elif event_type == "invoice.payment_succeeded":
-            _handle_payment_succeeded(db, data)
-        elif event_type == "invoice.payment_failed":
-            _handle_payment_failed(db, data)
-
+    changes = []
+    if body.full_name is not None and body.full_name.strip():
+        current_user.full_name = body.full_name.strip()
+        changes.append("full_name")
+    if body.address is not None:
+        if hasattr(current_user, 'address'):
+            current_user.address = body.address.strip()
+        changes.append("address")
+    if body.country is not None:
+        current_user.country = body.country
+        changes.append("country")
+    if body.collective_agreement is not None:
+        current_user.collective_agreement = body.collective_agreement
+        changes.append("collective_agreement")
+    if changes:
+        log_audit(db, current_user.id, "profile_updated", request, f"fields:{','.join(changes)}")
         db.commit()
-    except Exception as e:
-        logger.error(f"[WEBHOOK_ERROR] {event_type}: {e}")
-        db.rollback()
-        return {"status": "error_logged"}
-    finally:
-        db.close()
-
-    return {"status": "ok"}
-
-
-def _get_user_by_stripe_id(db: Session, customer_id: str):
-    return db.query(User).filter(User.stripe_customer_id == customer_id).first()
-
-def _add_audit(db: Session, user_id: int, action: str, details: str = None):
-    db.add(AuditLog(user_id=user_id, action=action, details=details))
-
-def _handle_checkout_completed(db: Session, session: dict):
-    customer_id = session.get("customer")
-    client_ref  = session.get("client_reference_id")
-    if not client_ref:
-        return
-    user = db.query(User).filter(User.id == int(client_ref)).first()
-    if user and customer_id:
-        user.stripe_customer_id = customer_id
-        logger.info(f"[STRIPE] Customer lié: user {user.id} → {customer_id}")
-
-def _handle_sub_created(db: Session, subscription: dict):
-    user = _get_user_by_stripe_id(db, subscription["customer"])
-    if not user:
-        return
-    user.subscription_status = SubscriptionStatus.PRO
-    user.stripe_sub_id = subscription["id"]
-    user.sub_expires_at = datetime.fromtimestamp(subscription["current_period_end"], tz=timezone.utc)
-    _add_audit(db, user.id, "subscription_created", f"sub_id={subscription['id']}")
-    logger.info(f"[STRIPE] Pro activé: {user.email}")
-
-def _handle_sub_updated(db: Session, subscription: dict):
-    user = _get_user_by_stripe_id(db, subscription["customer"])
-    if not user:
-        return
-    status_map = {
-        "active":   SubscriptionStatus.PRO,
-        "trialing": SubscriptionStatus.PRO,
-        "past_due": SubscriptionStatus.PRO,
-        "canceled": SubscriptionStatus.CANCELLED,
-        "unpaid":   SubscriptionStatus.FREE,
+        logger.info(f"[PROFILE_UPDATE] {current_user.email} | fields:{changes}")
+    return {
+        "message": "Profil mis à jour avec succès.",
+        "user": {
+            "id": current_user.id, "email": current_user.email,
+            "full_name": current_user.full_name,
+            "address": getattr(current_user, 'address', None),
+            "country": current_user.country,
+            "collective_agreement": current_user.collective_agreement,
+        }
     }
-    user.subscription_status = status_map.get(subscription["status"], SubscriptionStatus.FREE)
-    user.sub_expires_at = datetime.fromtimestamp(subscription["current_period_end"], tz=timezone.utc)
-    _add_audit(db, user.id, "subscription_updated", f"status={subscription['status']}")
-
-def _handle_sub_deleted(db: Session, subscription: dict):
-    user = _get_user_by_stripe_id(db, subscription["customer"])
-    if not user:
-        return
-    user.subscription_status = SubscriptionStatus.CANCELLED
-    user.stripe_sub_id = None
-    _add_audit(db, user.id, "subscription_cancelled")
-    logger.info(f"[STRIPE] Abonnement annulé: {user.email}")
-
-def _handle_payment_succeeded(db: Session, invoice: dict):
-    user = _get_user_by_stripe_id(db, invoice.get("customer"))
-    if user:
-        _add_audit(db, user.id, "payment_succeeded", f"amount={invoice.get('amount_paid')}cents")
-        logger.info(f"[STRIPE] Paiement reçu: {user.email}")
-
-def _handle_payment_failed(db: Session, invoice: dict):
-    user = _get_user_by_stripe_id(db, invoice.get("customer"))
-    if user:
-        _add_audit(db, user.id, "payment_failed", f"amount={invoice.get('amount_due')}cents")
-        logger.warning(f"[STRIPE] Paiement échoué: {user.email}")
